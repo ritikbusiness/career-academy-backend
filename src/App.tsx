@@ -11,6 +11,8 @@ import LoginForm from "./components/auth/LoginForm";
 import SignupForm from "./components/auth/SignupForm";
 import OnboardingForm from "./components/auth/OnboardingForm";
 import Dashboard from "./pages/Dashboard";
+import InstructorDashboard from "./pages/InstructorDashboard";
+import StudentCourses from "./pages/StudentCourses";
 import Unauthorized from "./pages/Unauthorized";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 

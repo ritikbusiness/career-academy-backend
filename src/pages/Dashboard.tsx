@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/layout/Header';
+import { Link } from 'react-router-dom';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -21,7 +22,9 @@ const Dashboard = () => {
               <CardContent>
                 <p className="text-2xl font-bold">0</p>
                 <p className="text-sm text-muted-foreground">Enrolled courses</p>
-                <Button className="mt-4 w-full">Browse Courses</Button>
+                <Link to="/courses">
+                  <Button className="mt-4 w-full">Browse Courses</Button>
+                </Link>
               </CardContent>
             </Card>
             
@@ -60,7 +63,9 @@ const Dashboard = () => {
               <CardContent>
                 <p className="text-2xl font-bold">0</p>
                 <p className="text-sm text-muted-foreground">Active courses</p>
-                <Button className="mt-4 w-full">Create Course</Button>
+                <Link to="/instructor/dashboard">
+                  <Button className="mt-4 w-full">Manage Courses</Button>
+                </Link>
               </CardContent>
             </Card>
             
