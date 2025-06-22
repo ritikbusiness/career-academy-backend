@@ -48,8 +48,7 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
                     <ChevronRight className="w-4 h-4" />
                   )}
                   <div>
-                    <h4 className="font-medium">Module {moduleIndex +
-}</h4>
+                    <h4 className="font-medium">Module {moduleIndex + 1}</h4>
                     <p className="text-sm text-gray-600">{module.title}</p>
                   </div>
                 </div>
