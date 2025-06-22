@@ -1,13 +1,10 @@
-
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Header from '@/components/layout/Header';
 import CourseBrowser from '@/components/student/CourseBrowser';
 import CourseViewer from '@/components/student/CourseViewer';
+import EnrolledCoursesGrid from '@/components/student/EnrolledCoursesGrid';
 import { Course, Module, Enrollment, CourseProgress } from '@/types/course';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 
 const StudentCourses = () => {
@@ -95,7 +92,6 @@ const StudentCourses = () => {
     if (!course) return;
 
     if (course.price > 0) {
-      // Redirect to payment in real app
       toast({
         title: "Payment Required",
         description: `This course costs ₹${course.price}. Payment integration will be added in Phase 4.`,
@@ -103,7 +99,6 @@ const StudentCourses = () => {
       return;
     }
 
-    // Free enrollment
     const newEnrollment: Enrollment = {
       id: Date.now().toString(),
       userId: 'currentUser',
@@ -116,7 +111,6 @@ const StudentCourses = () => {
 
     setEnrollments(prev => [...prev, newEnrollment]);
 
-    // Initialize progress
     const modules = courseModules[courseId] || [];
     const totalLessons = modules.reduce((sum, module) => sum + module.lessons.length, 0);
     
@@ -158,7 +152,6 @@ const StudentCourses = () => {
       }
     }));
 
-    // Update enrollment
     setEnrollments(prev => prev.map(enrollment =>
       enrollment.courseId === selectedCourse.id
         ? { ...enrollment, progress: newProgress, completedLessons: updatedCompletedLessons }
@@ -169,13 +162,6 @@ const StudentCourses = () => {
       title: "Lesson Completed!",
       description: "Great job! Keep up the learning momentum.",
     });
-  };
-
-  const getEnrolledCourses = () => {
-    return enrollments.map(enrollment => {
-      const course = availableCourses.find(c => c.id === enrollment.courseId);
-      return course ? { ...course, enrollment } : null;
-    }).filter(Boolean) as (Course & { enrollment: Enrollment })[];
   };
 
   if (selectedCourse) {
@@ -208,9 +194,13 @@ const StudentCourses = () => {
         </div>
 
         <Tabs defaultValue="browse" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="browse">Browse Courses</TabsTrigger>
-            <TabsTrigger value="enrolled">My Courses ({enrollments.length})</TabsTrigger>
+          <TabsList className="bg-white border border-gray-200 p-1 rounded-lg">
+            <TabsTrigger value="browse" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">
+              Browse Courses
+            </TabsTrigger>
+            <TabsTrigger value="enrolled" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">
+              My Courses ({enrollments.length})
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="browse">
@@ -222,56 +212,12 @@ const StudentCourses = () => {
           </TabsContent>
 
           <TabsContent value="enrolled">
-            {enrollments.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-12">
-                  <h3 className="text-lg font-medium mb-2">No courses enrolled yet</h3>
-                  <p className="text-gray-600 mb-4">Start learning by browsing our available courses</p>
-                  <Button onClick={() => {
-                    const browseTab = document.querySelector('[value="browse"]') as HTMLElement;
-                    browseTab?.click();
-                  }}>
-                    Browse Courses
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {getEnrolledCourses().map((course) => {
-                  const progress = courseProgress[course.id] || { progress: 0, completedLessons: [], totalLessons: 0 };
-                  
-                  return (
-                    <Card key={course.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-                      <CardHeader>
-                        <CardTitle className="text-lg">{course.title}</CardTitle>
-                        <CardDescription>{course.instructor.name}</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-4">
-                          <div>
-                            <div className="flex justify-between text-sm mb-2">
-                              <span>Progress</span>
-                              <span>{Math.round(progress.progress)}%</span>
-                            </div>
-                            <Progress value={progress.progress} />
-                            <p className="text-xs text-gray-600 mt-1">
-                              {progress.completedLessons.length} of {progress.totalLessons} lessons completed
-                            </p>
-                          </div>
-                          
-                          <Button 
-                            className="w-full"
-                            onClick={() => setSelectedCourse(course)}
-                          >
-                            {progress.progress === 0 ? 'Start Learning' : 'Continue Learning'}
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
+            <EnrolledCoursesGrid
+              enrollments={enrollments}
+              availableCourses={availableCourses}
+              courseProgress={courseProgress}
+              onCourseSelect={setSelectedCourse}
+            />
           </TabsContent>
         </Tabs>
       </main>

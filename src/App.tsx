@@ -38,6 +38,14 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
+            <Route 
+              path="/courses" 
+              element={
+                <ProtectedRoute>
+                  <StudentCourses />
+                </ProtectedRoute>
+              } 
+            />
             <Route path="/unauthorized" element={<Unauthorized />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
