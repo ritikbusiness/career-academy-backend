@@ -125,7 +125,7 @@ const StudentCourses = () => {
       [courseId]: {
         courseId,
         totalLessons,
-        completedLessons: 0,
+        completedLessons: [],
         progress: 0
       }
     }));
@@ -153,7 +153,7 @@ const StudentCourses = () => {
       ...prev,
       [selectedCourse.id]: {
         ...currentProgress,
-        completedLessons: updatedCompletedLessons.length,
+        completedLessons: updatedCompletedLessons,
         progress: newProgress
       }
     }));
@@ -183,7 +183,7 @@ const StudentCourses = () => {
     const progress = courseProgress[selectedCourse.id] || {
       courseId: selectedCourse.id,
       totalLessons: modules.reduce((sum, module) => sum + module.lessons.length, 0),
-      completedLessons: 0,
+      completedLessons: [],
       progress: 0
     };
 
@@ -227,7 +227,10 @@ const StudentCourses = () => {
                 <CardContent className="text-center py-12">
                   <h3 className="text-lg font-medium mb-2">No courses enrolled yet</h3>
                   <p className="text-gray-600 mb-4">Start learning by browsing our available courses</p>
-                  <Button onClick={() => document.querySelector('[value="browse"]')?.click()}>
+                  <Button onClick={() => {
+                    const browseTab = document.querySelector('[value="browse"]') as HTMLElement;
+                    browseTab?.click();
+                  }}>
                     Browse Courses
                   </Button>
                 </CardContent>
@@ -235,7 +238,7 @@ const StudentCourses = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {getEnrolledCourses().map((course) => {
-                  const progress = courseProgress[course.id] || { progress: 0, completedLessons: 0, totalLessons: 0 };
+                  const progress = courseProgress[course.id] || { progress: 0, completedLessons: [], totalLessons: 0 };
                   
                   return (
                     <Card key={course.id} className="hover:shadow-lg transition-shadow cursor-pointer">
@@ -252,7 +255,7 @@ const StudentCourses = () => {
                             </div>
                             <Progress value={progress.progress} />
                             <p className="text-xs text-gray-600 mt-1">
-                              {progress.completedLessons} of {progress.totalLessons} lessons completed
+                              {progress.completedLessons.length} of {progress.totalLessons} lessons completed
                             </p>
                           </div>
                           

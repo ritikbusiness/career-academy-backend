@@ -64,7 +64,7 @@ const CourseViewer: React.FC<CourseViewerProps> = ({
             </div>
             <div className="text-right">
               <div className="text-sm text-gray-600 mb-1">
-                Progress: {progress.completedLessons}/{progress.totalLessons} lessons
+                Progress: {progress.completedLessons.length}/{progress.totalLessons} lessons
               </div>
               <Progress value={progress.progress} className="w-48" />
             </div>
@@ -214,7 +214,7 @@ const CourseViewer: React.FC<CourseViewerProps> = ({
                           {Math.round(progress.progress)}%
                         </div>
                         <p className="text-sm text-gray-600">
-                          {progress.completedLessons} of {progress.totalLessons} lessons completed
+                          {progress.completedLessons.length} of {progress.totalLessons} lessons completed
                         </p>
                       </div>
                       <div>

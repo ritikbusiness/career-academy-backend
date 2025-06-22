@@ -52,7 +52,7 @@ export interface Enrollment {
 export interface CourseProgress {
   courseId: string;
   totalLessons: number;
-  completedLessons: number;
+  completedLessons: string[];
   progress: number;
   currentModule?: string;
   currentLesson?: string;
