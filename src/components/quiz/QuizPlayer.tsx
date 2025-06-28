@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Clock, CheckCircle, XCircle, ArrowRight, ArrowLeft } from 'lucide-react';
-import { Quiz, Question, QuizAttempt } from '@/types/quiz';
+import { ArrowRight, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Quiz, QuizAttempt } from '@/types/quiz';
+import QuizQuestion from './QuizQuestion';
+import QuizTimer from './QuizTimer';
 
 interface QuizPlayerProps {
   quiz: Quiz;
@@ -60,13 +61,13 @@ const QuizPlayer: React.FC<QuizPlayerProps> = ({ quiz, onComplete, onExit }) => 
     const timeSpent = Math.floor((Date.now() - startTime) / 1000);
     
     // TODO: connect to backend - calculate score and create attempt
-    const score = Math.floor(Math.random() * 100); // Dummy score
+    const score = Math.floor(Math.random() * 100);
     const passed = score >= quiz.passingScore;
 
     const attempt: QuizAttempt = {
       id: Date.now().toString(),
       quizId: quiz.id,
-      userId: 'current-user-id', // TODO: get from auth context
+      userId: 'current-user-id',
       answers,
       score,
       passed,
@@ -77,125 +78,48 @@ const QuizPlayer: React.FC<QuizPlayerProps> = ({ quiz, onComplete, onExit }) => 
     onComplete(attempt);
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="max-w-4xl mx-auto p-6">
         {/* Header */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 mb-6 overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-8 py-6 text-white">
-            <div className="flex items-center justify-between mb-4">
-              <h1 className="text-2xl font-bold">{quiz.title}</h1>
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 mb-8 overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 px-8 py-8 text-white">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-3xl font-bold mb-2">{quiz.title}</h1>
+                <p className="text-blue-100 text-lg">Stay focused and do your best!</p>
+              </div>
               <div className="flex items-center gap-6">
-                {timeRemaining && (
-                  <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
-                    <Clock className="w-5 h-5" />
-                    <span className="font-mono text-lg font-semibold">{formatTime(timeRemaining)}</span>
-                  </div>
-                )}
+                {timeRemaining && <QuizTimer timeRemaining={timeRemaining} />}
                 <Button 
                   variant="outline" 
                   onClick={onExit}
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200"
+                  className="bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20 transition-all duration-300"
                 >
                   Exit Quiz
                 </Button>
               </div>
             </div>
-            <Progress value={progress} className="h-3 bg-white/20" />
-            <p className="text-blue-100 mt-3 text-sm font-medium">
-              Question {currentQuestionIndex + 1} of {quiz.questions.length}
-            </p>
+            <div className="space-y-3">
+              <Progress value={progress} className="h-4 bg-white/20" />
+              <div className="flex justify-between text-blue-100 text-sm font-medium">
+                <span>Question {currentQuestionIndex + 1} of {quiz.questions.length}</span>
+                <span>{Math.round(progress)}% Complete</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Question Card */}
-        <Card className="bg-white rounded-2xl shadow-lg border-0 mb-8 overflow-hidden">
-          <CardContent className="p-8">
-            <div className="mb-8">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
-                  {currentQuestionIndex + 1}
-                </div>
-                <div className="text-sm text-slate-500 font-medium">
-                  {currentQuestion.type === 'multiple-choice' ? 'Multiple Choice' : 'True or False'}
-                </div>
-              </div>
-              
-              <h2 className="text-xl font-semibold text-slate-800 leading-relaxed">
-                {currentQuestion.question}
-              </h2>
-            </div>
-            
-            {/* Multiple Choice Options */}
-            {currentQuestion.type === 'multiple-choice' && currentQuestion.options && (
-              <div className="space-y-4">
-                {currentQuestion.options.map((option, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleAnswerSelect(index)}
-                    className={`w-full p-5 text-left border-2 rounded-xl transition-all duration-200 group ${
-                      answers[currentQuestion.id] === index
-                        ? 'border-blue-500 bg-blue-50 shadow-sm'
-                        : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
-                        answers[currentQuestion.id] === index
-                          ? 'border-blue-500 bg-blue-500'
-                          : 'border-slate-300 group-hover:border-blue-400'
-                      }`}>
-                        {answers[currentQuestion.id] === index && (
-                          <div className="w-2.5 h-2.5 rounded-full bg-white"></div>
-                        )}
-                      </div>
-                      <span className="text-slate-700 font-medium">{option}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* True/False Options */}
-            {currentQuestion.type === 'true-false' && (
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  { label: 'True', value: true, color: 'green' },
-                  { label: 'False', value: false, color: 'red' }
-                ].map((option) => (
-                  <button
-                    key={option.label}
-                    onClick={() => handleAnswerSelect(option.value)}
-                    className={`p-6 text-center border-2 rounded-xl transition-all duration-200 group ${
-                      answers[currentQuestion.id] === option.value
-                        ? `border-${option.color}-500 bg-${option.color}-50 shadow-sm`
-                        : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex flex-col items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-colors ${
-                        answers[currentQuestion.id] === option.value
-                          ? `border-${option.color}-500 bg-${option.color}-500`
-                          : 'border-slate-300 group-hover:border-slate-400'
-                      }`}>
-                        {answers[currentQuestion.id] === option.value && (
-                          <CheckCircle className="w-4 h-4 text-white" />
-                        )}
-                      </div>
-                      <span className="text-lg font-semibold text-slate-700">{option.label}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Question */}
+        <div className="mb-8">
+          <QuizQuestion
+            question={currentQuestion}
+            questionIndex={currentQuestionIndex}
+            totalQuestions={quiz.questions.length}
+            selectedAnswer={answers[currentQuestion.id]}
+            onAnswerSelect={handleAnswerSelect}
+          />
+        </div>
 
         {/* Navigation */}
         <div className="flex items-center justify-between">
@@ -203,30 +127,30 @@ const QuizPlayer: React.FC<QuizPlayerProps> = ({ quiz, onComplete, onExit }) => 
             variant="outline"
             onClick={handlePrevious}
             disabled={currentQuestionIndex === 0}
-            className="px-6 py-3 rounded-xl border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-all duration-200"
+            className="px-8 py-4 rounded-2xl border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-all duration-300 font-semibold"
           >
-            <ArrowLeft className="w-4 h-4 mr-2" />
+            <ArrowLeft className="w-5 h-5 mr-3" />
             Previous
           </Button>
 
-          <div className="flex gap-3">
+          <div className="flex gap-4">
             {currentQuestionIndex === quiz.questions.length - 1 ? (
               <Button
                 onClick={handleSubmit}
                 disabled={answers[currentQuestion.id] === undefined}
-                className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-xl shadow-lg hover:shadow-xl disabled:opacity-50 transition-all duration-200 font-semibold"
+                className="px-10 py-4 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-2xl shadow-lg hover:shadow-xl disabled:opacity-50 transition-all duration-300 font-semibold text-lg"
               >
                 Submit Quiz
-                <CheckCircle className="w-4 h-4 ml-2" />
+                <CheckCircle className="w-5 h-5 ml-3" />
               </Button>
             ) : (
               <Button
                 onClick={handleNext}
                 disabled={answers[currentQuestion.id] === undefined}
-                className="px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl shadow-lg hover:shadow-xl disabled:opacity-50 transition-all duration-200 font-semibold"
+                className="px-10 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl shadow-lg hover:shadow-xl disabled:opacity-50 transition-all duration-300 font-semibold text-lg"
               >
                 Next Question
-                <ArrowRight className="w-4 h-4 ml-2" />
+                <ArrowRight className="w-5 h-5 ml-3" />
               </Button>
             )}
           </div>
