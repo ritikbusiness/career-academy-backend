@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Quiz, Question, QuizAttempt } from '@/types/quiz';
 
 interface QuizPlayerProps {
@@ -83,122 +84,154 @@ const QuizPlayer: React.FC<QuizPlayerProps> = ({ quiz, onComplete, onExit }) => 
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>{quiz.title}</CardTitle>
-            <div className="flex items-center gap-4">
-              {timeRemaining && (
-                <div className="flex items-center gap-2 text-orange-600">
-                  <Clock className="w-4 h-4" />
-                  <span className="font-mono">{formatTime(timeRemaining)}</span>
-                </div>
-              )}
-              <Button variant="outline" onClick={onExit}>
-                Exit Quiz
-              </Button>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 mb-6 overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-8 py-6 text-white">
+            <div className="flex items-center justify-between mb-4">
+              <h1 className="text-2xl font-bold">{quiz.title}</h1>
+              <div className="flex items-center gap-6">
+                {timeRemaining && (
+                  <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
+                    <Clock className="w-5 h-5" />
+                    <span className="font-mono text-lg font-semibold">{formatTime(timeRemaining)}</span>
+                  </div>
+                )}
+                <Button 
+                  variant="outline" 
+                  onClick={onExit}
+                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200"
+                >
+                  Exit Quiz
+                </Button>
+              </div>
             </div>
+            <Progress value={progress} className="h-3 bg-white/20" />
+            <p className="text-blue-100 mt-3 text-sm font-medium">
+              Question {currentQuestionIndex + 1} of {quiz.questions.length}
+            </p>
           </div>
-          <Progress value={progress} className="mt-4" />
-          <p className="text-sm text-gray-600 mt-2">
-            Question {currentQuestionIndex + 1} of {quiz.questions.length}
-          </p>
-        </CardHeader>
+        </div>
 
-        <CardContent className="space-y-6">
-          <div>
-            <h3 className="text-lg font-medium mb-4">{currentQuestion.question}</h3>
+        {/* Question Card */}
+        <Card className="bg-white rounded-2xl shadow-lg border-0 mb-8 overflow-hidden">
+          <CardContent className="p-8">
+            <div className="mb-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
+                  {currentQuestionIndex + 1}
+                </div>
+                <div className="text-sm text-slate-500 font-medium">
+                  {currentQuestion.type === 'multiple-choice' ? 'Multiple Choice' : 'True or False'}
+                </div>
+              </div>
+              
+              <h2 className="text-xl font-semibold text-slate-800 leading-relaxed">
+                {currentQuestion.question}
+              </h2>
+            </div>
             
+            {/* Multiple Choice Options */}
             {currentQuestion.type === 'multiple-choice' && currentQuestion.options && (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {currentQuestion.options.map((option, index) => (
                   <button
                     key={index}
                     onClick={() => handleAnswerSelect(index)}
-                    className={`w-full p-4 text-left border rounded-lg transition-colors ${
+                    className={`w-full p-5 text-left border-2 rounded-xl transition-all duration-200 group ${
                       answers[currentQuestion.id] === index
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-blue-500 bg-blue-50 shadow-sm'
+                        : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-4 h-4 rounded-full border-2 ${
+                    <div className="flex items-center gap-4">
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
                         answers[currentQuestion.id] === index
                           ? 'border-blue-500 bg-blue-500'
-                          : 'border-gray-300'
+                          : 'border-slate-300 group-hover:border-blue-400'
                       }`}>
                         {answers[currentQuestion.id] === index && (
-                          <div className="w-full h-full rounded-full bg-white scale-50"></div>
+                          <div className="w-2.5 h-2.5 rounded-full bg-white"></div>
                         )}
                       </div>
-                      <span>{option}</span>
+                      <span className="text-slate-700 font-medium">{option}</span>
                     </div>
                   </button>
                 ))}
               </div>
             )}
 
+            {/* True/False Options */}
             {currentQuestion.type === 'true-false' && (
-              <div className="space-y-3">
-                {['True', 'False'].map((option, index) => (
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { label: 'True', value: true, color: 'green' },
+                  { label: 'False', value: false, color: 'red' }
+                ].map((option) => (
                   <button
-                    key={option}
-                    onClick={() => handleAnswerSelect(index === 0)}
-                    className={`w-full p-4 text-left border rounded-lg transition-colors ${
-                      answers[currentQuestion.id] === (index === 0)
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                    key={option.label}
+                    onClick={() => handleAnswerSelect(option.value)}
+                    className={`p-6 text-center border-2 rounded-xl transition-all duration-200 group ${
+                      answers[currentQuestion.id] === option.value
+                        ? `border-${option.color}-500 bg-${option.color}-50 shadow-sm`
+                        : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-4 h-4 rounded-full border-2 ${
-                        answers[currentQuestion.id] === (index === 0)
-                          ? 'border-blue-500 bg-blue-500'
-                          : 'border-gray-300'
+                    <div className="flex flex-col items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-colors ${
+                        answers[currentQuestion.id] === option.value
+                          ? `border-${option.color}-500 bg-${option.color}-500`
+                          : 'border-slate-300 group-hover:border-slate-400'
                       }`}>
-                        {answers[currentQuestion.id] === (index === 0) && (
-                          <div className="w-full h-full rounded-full bg-white scale-50"></div>
+                        {answers[currentQuestion.id] === option.value && (
+                          <CheckCircle className="w-4 h-4 text-white" />
                         )}
                       </div>
-                      <span>{option}</span>
+                      <span className="text-lg font-semibold text-slate-700">{option.label}</span>
                     </div>
                   </button>
                 ))}
               </div>
             )}
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className="flex justify-between pt-6">
-            <Button
-              variant="outline"
-              onClick={handlePrevious}
-              disabled={currentQuestionIndex === 0}
-            >
-              Previous
-            </Button>
+        {/* Navigation */}
+        <div className="flex items-center justify-between">
+          <Button
+            variant="outline"
+            onClick={handlePrevious}
+            disabled={currentQuestionIndex === 0}
+            className="px-6 py-3 rounded-xl border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-all duration-200"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Previous
+          </Button>
 
-            <div className="flex gap-3">
-              {currentQuestionIndex === quiz.questions.length - 1 ? (
-                <Button
-                  onClick={handleSubmit}
-                  disabled={!answers[currentQuestion.id]}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  Submit Quiz
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleNext}
-                  disabled={!answers[currentQuestion.id]}
-                >
-                  Next Question
-                </Button>
-              )}
-            </div>
+          <div className="flex gap-3">
+            {currentQuestionIndex === quiz.questions.length - 1 ? (
+              <Button
+                onClick={handleSubmit}
+                disabled={answers[currentQuestion.id] === undefined}
+                className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-xl shadow-lg hover:shadow-xl disabled:opacity-50 transition-all duration-200 font-semibold"
+              >
+                Submit Quiz
+                <CheckCircle className="w-4 h-4 ml-2" />
+              </Button>
+            ) : (
+              <Button
+                onClick={handleNext}
+                disabled={answers[currentQuestion.id] === undefined}
+                className="px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl shadow-lg hover:shadow-xl disabled:opacity-50 transition-all duration-200 font-semibold"
+              >
+                Next Question
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 };

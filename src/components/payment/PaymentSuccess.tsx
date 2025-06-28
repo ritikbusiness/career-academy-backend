@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Download, ArrowRight } from 'lucide-react';
+import { CheckCircle, Download, ArrowRight, Gift, Clock, Users, Award } from 'lucide-react';
 import { PaymentTransaction } from '@/types/payment';
 import { Course } from '@/types/course';
 
@@ -37,88 +37,145 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <Card>
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-              <CheckCircle className="w-8 h-8 text-green-600" />
-            </div>
-          </div>
-          <CardTitle className="text-2xl text-green-600">Payment Successful!</CardTitle>
-          <p className="text-gray-600">You've successfully enrolled in the course</p>
-        </CardHeader>
-
-        <CardContent className="space-y-6">
-          {/* Course Info */}
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <h3 className="font-semibold text-lg mb-2">{course.title}</h3>
-            <p className="text-gray-600 text-sm">{course.description}</p>
-            <div className="flex items-center justify-between mt-3">
-              <span className="text-sm text-gray-500">Instructor: {course.instructor.name}</span>
-              <span className="font-semibold">{formatPrice(transaction.amount)}</span>
-            </div>
-          </div>
-
-          {/* Transaction Details */}
-          <div className="space-y-3">
-            <h4 className="font-semibold">Transaction Details</h4>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-gray-600">Transaction ID</span>
-                <p className="font-mono">{transaction.id}</p>
-              </div>
-              <div>
-                <span className="text-gray-600">Payment Method</span>
-                <p className="capitalize">{transaction.paymentMethod}</p>
-              </div>
-              <div>
-                <span className="text-gray-600">Amount Paid</span>
-                <p className="font-semibold">{formatPrice(transaction.amount)}</p>
-              </div>
-              <div>
-                <span className="text-gray-600">Date & Time</span>
-                <p>{formatDate(transaction.completedAt || transaction.createdAt)}</p>
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-4">
+      <div className="max-w-3xl mx-auto">
+        {/* Success Header */}
+        <Card className="bg-white rounded-2xl shadow-lg border-0 mb-8 overflow-hidden">
+          <div className="bg-gradient-to-r from-green-500 to-green-600 px-8 py-12 text-white text-center">
+            <div className="flex justify-center mb-6">
+              <div className="w-24 h-24 bg-green-400 rounded-full flex items-center justify-center shadow-lg">
+                <CheckCircle className="w-12 h-12 text-white" />
               </div>
             </div>
+            <h1 className="text-3xl font-bold mb-2">Payment Successful! 🎉</h1>
+            <p className="text-green-100 text-lg">Welcome to your new learning journey</p>
           </div>
+        </Card>
 
-          {/* Next Steps */}
-          <div className="p-4 bg-blue-50 rounded-lg">
-            <h4 className="font-semibold text-blue-800 mb-2">What's Next?</h4>
-            <ul className="text-sm text-blue-700 space-y-1">
-              <li>• You now have lifetime access to this course</li>
-              <li>• Start learning immediately or save for later</li>
-              <li>• Download your receipt for tax purposes</li>
-              <li>• Access course materials anytime from your dashboard</li>
-            </ul>
-          </div>
+        {/* Course Info */}
+        <Card className="bg-white rounded-2xl shadow-sm border-0 mb-8">
+          <CardHeader className="border-b border-slate-100 px-8 py-6">
+            <CardTitle className="text-xl font-semibold text-slate-800">Course Enrolled</CardTitle>
+          </CardHeader>
+          <CardContent className="p-8">
+            <div className="flex gap-6">
+              <div className="w-32 h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <span className="text-3xl">🎓</span>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-2xl font-bold text-slate-800 mb-3">{course.title}</h3>
+                <p className="text-slate-600 mb-4">{course.description}</p>
+                <div className="flex items-center gap-6 text-sm text-slate-500">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    <span>{course.duration}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    <span>{course.enrolledCount} students</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Award className="w-4 h-4" />
+                    <span>Certificate included</span>
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center justify-between">
+                  <span className="text-sm text-slate-500">Instructor: {course.instructor.name}</span>
+                  <span className="text-2xl font-bold text-green-600">{formatPrice(transaction.amount)}</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={onDownloadReceipt}
-              className="flex-1 flex items-center justify-center gap-2"
-            >
-              <Download className="w-4 h-4" />
-              Download Receipt
-            </Button>
-            <Button
-              onClick={onStartCourse}
-              className="flex-1 flex items-center justify-center gap-2"
-            >
-              Start Course Now
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          </div>
+        {/* Transaction Details */}
+        <Card className="bg-white rounded-2xl shadow-sm border-0 mb-8">
+          <CardHeader className="border-b border-slate-100 px-8 py-6">
+            <CardTitle className="text-xl font-semibold text-slate-800">Transaction Details</CardTitle>
+          </CardHeader>
+          <CardContent className="p-8">
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <span className="text-sm font-medium text-slate-500">Transaction ID</span>
+                  <p className="font-mono text-slate-800 bg-slate-50 px-3 py-2 rounded-lg mt-1">{transaction.id}</p>
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-slate-500">Payment Method</span>
+                  <p className="text-slate-800 font-semibold capitalize mt-1">{transaction.paymentMethod}</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <span className="text-sm font-medium text-slate-500">Amount Paid</span>
+                  <p className="text-2xl font-bold text-green-600 mt-1">{formatPrice(transaction.amount)}</p>
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-slate-500">Date & Time</span>
+                  <p className="text-slate-800 font-medium mt-1">{formatDate(transaction.completedAt || transaction.createdAt)}</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Support Info */}
-          <div className="text-center text-sm text-gray-500">
-            <p>Need help? Contact our support team at support@learningplatform.com</p>
-          </div>
-        </CardContent>
-      </Card>
+        {/* What's Next */}
+        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-sm border-0 mb-8">
+          <CardContent className="p-8">
+            <div className="flex items-start gap-4 mb-6">
+              <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Gift className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h4 className="text-xl font-bold text-slate-800 mb-2">What's Next?</h4>
+                <p className="text-slate-600">You now have lifetime access to this course and all its benefits!</p>
+              </div>
+            </div>
+            
+            <div className="grid md:grid-cols-2 gap-4">
+              {[
+                '✅ Lifetime access to course content',
+                '✅ Mobile & desktop compatibility',
+                '✅ Certificate of completion',
+                '✅ Direct messaging with instructor',
+                '✅ 30-day money-back guarantee',
+                '✅ Access to student community'
+              ].map((benefit, index) => (
+                <div key={index} className="flex items-center gap-3 text-slate-700">
+                  <span className="text-sm font-medium">{benefit}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-8">
+          <Button
+            onClick={onStartCourse}
+            className="flex-1 h-14 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 font-semibold text-lg"
+          >
+            Start Learning Now
+            <ArrowRight className="w-5 h-5 ml-2" />
+          </Button>
+          <Button
+            variant="outline"
+            onClick={onDownloadReceipt}
+            className="flex-1 h-14 rounded-xl border-slate-300 text-slate-700 hover:bg-slate-50 transition-all duration-200 font-semibold"
+          >
+            <Download className="w-5 h-5 mr-2" />
+            Download Receipt
+          </Button>
+        </div>
+
+        {/* Support Info */}
+        <div className="text-center p-6 bg-white rounded-2xl shadow-sm border-0">
+          <p className="text-slate-600 mb-2">Need help getting started?</p>
+          <p className="text-sm text-slate-500">
+            Contact our support team at <span className="font-semibold text-blue-600">support@learningplatform.com</span>
+          </p>
+        </div>
+      </div>
     </div>
   );
 };
