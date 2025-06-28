@@ -4,7 +4,7 @@ export interface Question {
   type: 'multiple-choice' | 'true-false';
   question: string;
   options?: string[];
-  correctAnswer: string | number;
+  correctAnswer: string | number | boolean;
   explanation?: string;
 }
 
@@ -24,7 +24,7 @@ export interface QuizAttempt {
   id: string;
   quizId: string;
   userId: string;
-  answers: { [questionId: string]: string | number };
+  answers: { [questionId: string]: string | number | boolean };
   score: number;
   passed: boolean;
   completedAt: string;
@@ -34,6 +34,6 @@ export interface QuizAttempt {
 export interface QuizResult {
   attempt: QuizAttempt;
   quiz: Quiz;
-  correctAnswers: { [questionId: string]: string | number };
+  correctAnswers: { [questionId: string]: string | number | boolean };
   feedback: { [questionId: string]: string };
 }

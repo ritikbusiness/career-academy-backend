@@ -223,7 +223,7 @@ const QuizEditor: React.FC<QuizEditorProps> = ({ lessonId, existingQuiz, onSave,
                         <div>
                           <Label>Correct Answer</Label>
                           <Select
-                            value={question.correctAnswer?.toString()}
+                            value={String(question.correctAnswer)}
                             onValueChange={(value) => updateQuestion(index, { correctAnswer: value === 'true' })}
                           >
                             <SelectTrigger>

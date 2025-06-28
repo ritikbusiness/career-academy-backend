@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +13,7 @@ interface QuizPlayerProps {
 
 const QuizPlayer: React.FC<QuizPlayerProps> = ({ quiz, onComplete, onExit }) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState<{ [questionId: string]: string | number }>({});
+  const [answers, setAnswers] = useState<{ [questionId: string]: string | number | boolean }>({});
   const [timeRemaining, setTimeRemaining] = useState(quiz.timeLimit ? quiz.timeLimit * 60 : null);
   const [startTime] = useState(Date.now());
 
@@ -37,7 +36,7 @@ const QuizPlayer: React.FC<QuizPlayerProps> = ({ quiz, onComplete, onExit }) => 
     return () => clearInterval(timer);
   }, [timeRemaining]);
 
-  const handleAnswerSelect = (answer: string | number) => {
+  const handleAnswerSelect = (answer: string | number | boolean) => {
     setAnswers(prev => ({
       ...prev,
       [currentQuestion.id]: answer
