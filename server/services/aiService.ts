@@ -2,7 +2,7 @@ import OpenAI from "openai";
 
 // DeepSeek API is compatible with OpenAI's interface
 const deepseek = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY,
+  apiKey: process.env.DEEPSEEK_API_KEY || "dummy-key",
   baseURL: "https://api.deepseek.com/v1"
 });
 

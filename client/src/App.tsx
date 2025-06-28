@@ -14,6 +14,8 @@ import Dashboard from "./pages/Dashboard";
 import InstructorDashboard from "./pages/InstructorDashboard";
 import StudentCourses from "./pages/StudentCourses";
 import Unauthorized from "./pages/Unauthorized";
+import FeatureDemo from "./pages/FeatureDemo";
+import MonetizationDemo from "./pages/MonetizationDemo";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 const queryClient = new QueryClient();
@@ -46,6 +48,16 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
+            <Route 
+              path="/instructor" 
+              element={
+                <ProtectedRoute requiredRole="instructor">
+                  <InstructorDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route path="/features" element={<FeatureDemo />} />
+            <Route path="/monetization" element={<MonetizationDemo />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
