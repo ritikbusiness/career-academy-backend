@@ -50,6 +50,25 @@ This is a full-stack Learning Management System built with a modern tech stack f
 - **Q&A Forums**: Lesson-specific discussion threads with upvoting and instructor responses
 - **Progress Tracking**: Completion tracking for lessons and overall course progress
 
+### AI-Powered Learning Features (NEW)
+- **AI Lesson Summarizer**: Auto-generates key points, takeaways, and summaries using DeepSeek API
+- **AI Practice Questions Generator**: Creates custom quiz questions based on lesson content
+- **AI Study Buddy**: Real-time chatbot for answering student questions about lessons
+- **AI Skill Gap Analyzer**: Identifies learning gaps and provides personalized recommendations
+
+### Enhanced Course Discovery
+- **Advanced Search & Filtering**: Smart filters by price, duration, difficulty, ratings, and domains
+- **Course Recommendations**: AI-powered suggestions based on user interests
+- **Wishlist Functionality**: Save courses for later access
+- **Recently Viewed Courses**: Quick access to previously browsed content
+
+### Learning Analytics Dashboard
+- **Progress Visualization**: Weekly/monthly learning activity charts
+- **Learning Streaks**: Track consecutive days of learning with achievements
+- **Skill Progression**: Visual representation of acquired skills and competencies
+- **Achievement System**: Badges and milestones for learning accomplishments
+- **Performance Analytics**: Detailed insights into learning patterns and velocity
+
 ### Payment Integration
 - Dual payment gateway support (Stripe and Razorpay)
 - Course checkout and payment success handling
@@ -111,7 +130,31 @@ This is a full-stack Learning Management System built with a modern tech stack f
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+- **June 28, 2025**: Successfully migrated from Lovable to Replit environment
+- **June 28, 2025**: Implemented AI-powered learning features using DeepSeek API:
+  - AI Lesson Summarizer for automatic content summarization
+  - AI Practice Questions Generator for custom quiz creation
+  - AI Study Buddy chatbot for real-time learning assistance
+  - AI Skill Gap Analyzer for personalized learning recommendations
+- **June 28, 2025**: Added enhanced course discovery and search functionality:
+  - Advanced search with smart filtering by price, duration, difficulty, ratings
+  - Course wishlist and recently viewed features
+  - Real-time search statistics and course recommendations
+- **June 28, 2025**: Implemented comprehensive learning analytics dashboard:
+  - Progress visualization with weekly/monthly charts
+  - Learning streak tracking with achievement system
+  - Skill progression monitoring and performance analytics
+  - Achievement badges and milestone tracking
+
+## External Dependencies
+
+### AI Integration
+- **DeepSeek API**: Powers all AI-driven features including lesson summarization, question generation, and skill analysis
+- **OpenAI-compatible interface**: Enables seamless integration with DeepSeek's language models
+
 ## Changelog
 
 Changelog:
-- June 28, 2025. Initial setup
+- June 28, 2025. Initial setup and migration to Replit completed with enhanced AI features

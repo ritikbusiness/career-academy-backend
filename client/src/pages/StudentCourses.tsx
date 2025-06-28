@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Header from '@/components/layout/Header';
 import CourseBrowser from '@/components/student/CourseBrowser';
 import CourseViewer from '@/components/student/CourseViewer';
 import EnrolledCoursesGrid from '@/components/student/EnrolledCoursesGrid';
+import AdvancedCourseSearch from '@/components/course/AdvancedCourseSearch';
+import LearningAnalyticsDashboard from '@/components/analytics/LearningAnalyticsDashboard';
 import { Course, Module, Enrollment, CourseProgress } from '@/types/course';
 import { useToast } from '@/hooks/use-toast';
+import { Search, TrendingUp, BookOpen, Heart } from 'lucide-react';
 
 const StudentCourses = () => {
   const { toast } = useToast();
@@ -84,6 +88,10 @@ const StudentCourses = () => {
 
   const [courseProgress, setCourseProgress] = useState<{ [courseId: string]: CourseProgress }>({});
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [filteredCourses, setFilteredCourses] = useState<Course[]>(availableCourses);
+  const [searchStats, setSearchStats] = useState<any>({});
+  const [wishlist, setWishlist] = useState<string[]>([]);
+  const [recentSearches, setRecentSearches] = useState<string[]>(['React', 'Python', 'Data Science']);
 
   const enrolledCourseIds = enrollments.map(e => e.courseId);
 
@@ -127,6 +135,25 @@ const StudentCourses = () => {
     toast({
       title: "Successfully Enrolled!",
       description: `You have been enrolled in ${course.title}`,
+    });
+  };
+
+  const handleFilteredResults = (courses: Course[], stats: any) => {
+    setFilteredCourses(courses);
+    setSearchStats(stats);
+  };
+
+  const handleAddToWishlist = (courseId: string) => {
+    setWishlist(prev => 
+      prev.includes(courseId)
+        ? prev.filter(id => id !== courseId)
+        : [...prev, courseId]
+    );
+    
+    const course = availableCourses.find(c => c.id === courseId);
+    toast({
+      title: wishlist.includes(courseId) ? "Removed from wishlist" : "Added to wishlist",
+      description: course ? `"${course.title}" ${wishlist.includes(courseId) ? 'removed from' : 'added to'} your wishlist.` : '',
     });
   };
 
@@ -193,23 +220,29 @@ const StudentCourses = () => {
           <p className="text-gray-600">Explore courses and track your progress</p>
         </div>
 
-        <Tabs defaultValue="browse" className="space-y-6">
-          <TabsList className="bg-white border border-gray-200 p-1 rounded-lg">
-            <TabsTrigger value="browse" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">
-              Browse Courses
-            </TabsTrigger>
-            <TabsTrigger value="enrolled" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">
+        <Tabs defaultValue="enrolled" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="enrolled" className="flex items-center gap-2">
+              <BookOpen className="w-4 h-4" />
               My Courses ({enrollments.length})
             </TabsTrigger>
+            <TabsTrigger value="browse" className="flex items-center gap-2">
+              <Search className="w-4 h-4" />
+              Discover
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" />
+              Analytics
+            </TabsTrigger>
+            <TabsTrigger value="wishlist" className="flex items-center gap-2">
+              <Heart className="w-4 h-4" />
+              Wishlist ({wishlist.length})
+            </TabsTrigger>
+            <TabsTrigger value="search" className="flex items-center gap-2">
+              <Search className="w-4 h-4" />
+              Advanced Search
+            </TabsTrigger>
           </TabsList>
-
-          <TabsContent value="browse">
-            <CourseBrowser
-              courses={availableCourses}
-              onEnroll={handleEnroll}
-              enrolledCourses={enrolledCourseIds}
-            />
-          </TabsContent>
 
           <TabsContent value="enrolled">
             <EnrolledCoursesGrid
@@ -217,6 +250,108 @@ const StudentCourses = () => {
               availableCourses={availableCourses}
               courseProgress={courseProgress}
               onCourseSelect={setSelectedCourse}
+            />
+          </TabsContent>
+
+          <TabsContent value="browse">
+            <div className="space-y-6">
+              {searchStats.total > 0 && (
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                      <div>
+                        <div className="text-2xl font-bold text-blue-600">{searchStats.total}</div>
+                        <div className="text-sm text-gray-600">Total Courses</div>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-green-600">{searchStats.free}</div>
+                        <div className="text-sm text-gray-600">Free Courses</div>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-purple-600">{searchStats.averageRating?.toFixed(1) || '0'}</div>
+                        <div className="text-sm text-gray-600">Avg Rating</div>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-orange-600">{searchStats.totalEnrollments || 0}</div>
+                        <div className="text-sm text-gray-600">Total Students</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              <CourseBrowser
+                courses={filteredCourses.length > 0 ? filteredCourses : availableCourses}
+                onEnroll={handleEnroll}
+                enrolledCourses={enrolledCourseIds}
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="analytics">
+            <LearningAnalyticsDashboard
+              enrollments={enrollments}
+              courses={availableCourses}
+              courseProgress={courseProgress}
+              quizResults={[]}
+            />
+          </TabsContent>
+
+          <TabsContent value="wishlist">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Heart className="w-5 h-5 text-red-600" />
+                  My Wishlist
+                </CardTitle>
+                <CardDescription>
+                  Courses you've saved for later
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {wishlist.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Heart className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Your wishlist is empty</h3>
+                    <p className="text-gray-600 mb-4">Save courses you're interested in to access them quickly later.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {wishlist.map(courseId => {
+                      const course = availableCourses.find(c => c.id === courseId);
+                      if (!course) return null;
+                      
+                      return (
+                        <Card key={courseId} className="relative">
+                          <CardContent className="p-4">
+                            <h4 className="font-semibold mb-2">{course.title}</h4>
+                            <p className="text-sm text-gray-600 mb-3">{course.description.substring(0, 100)}...</p>
+                            <div className="flex justify-between items-center">
+                              <span className="font-bold text-lg">
+                                {course.price === 0 ? 'Free' : `₹${course.price}`}
+                              </span>
+                              <button
+                                onClick={() => handleAddToWishlist(courseId)}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <Heart className="w-5 h-5 fill-current" />
+                              </button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="search">
+            <AdvancedCourseSearch
+              courses={availableCourses}
+              onFilteredResults={handleFilteredResults}
+              recentSearches={recentSearches}
+              onAddToWishlist={handleAddToWishlist}
             />
           </TabsContent>
         </Tabs>
