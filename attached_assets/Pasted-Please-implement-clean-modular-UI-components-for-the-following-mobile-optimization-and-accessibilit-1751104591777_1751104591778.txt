@@ -1,0 +1,97 @@
+Please implement clean, modular UI components for the following mobile optimization and accessibility features using:
+
+useState() dummy data
+
+// TODO: connect to backend comments for future logic
+
+Fully mobile-responsive design
+
+Modern, premium look (Apple/Coursera inspired)
+
+📱 Mobile Experience Features
+📥 1. Offline Mode UI (Downloadable Lessons)
+UI toggle per lesson: “Download for offline” button
+
+Download queue screen:
+
+Lesson title
+
+Progress bar / “Downloaded” status
+
+Retry/download failed states
+
+Dashboard tab: “Offline Library” with downloaded lessons list
+
+🔔 2. Mobile App Features
+UI for Push Notification Preferences:
+
+Settings screen with toggles: New course, Assignment due, Group messages
+
+Background Download settings panel (dummy options):
+
+Enable background downloads
+
+Limit by WiFi/data
+
+🎬 3. Mobile-Optimized Video Player
+Fullscreen video player layout
+
+Touch-friendly controls:
+
+Play/Pause, 10-sec skip, Volume slider
+
+Caption toggle
+
+Sticky “Resume Playback” bar on dashboard
+
+♿ Accessibility Features
+🧏‍♂️ 1. Screen Reader Support
+Use proper ARIA labels and semantic HTML
+
+Add visible “Skip to Content” button at top of page
+
+Accessible form inputs with labels, focus outlines
+
+⌨️ 2. Keyboard Navigation
+Ensure tab/arrow key navigation across:
+
+Menus, lessons, video controls, modal dialogs
+
+Add visible focus rings and active element styling
+
+🎞️ 3. Closed Captions (UI)
+Video player UI includes “CC” toggle
+
+Display sample captions (dummy data) synced with playback
+
+Option to upload .vtt file (UI only)
+
+🎨 4. Color Contrast & WCAG Compliance
+All text elements should follow proper contrast ratios
+
+Provide light/dark mode toggle with good readability
+
+Use Tailwind utilities for text-opacity, bg-opacity, and readable color schemes
+
+🛠️ Requirements
+Framework: React + Tailwind CSS
+
+All components should be:
+
+Modular (1 feature = 1 folder)
+
+Responsive and mobile-first
+
+Dummy data powered (useState or mock JSON)
+
+Leave integrations as // TODO: connect to backend
+
+Include smooth transitions for modals, toggles, loaders, etc.
+
+Optional: Use Tailwind’s @apply to organize repeated styles
+
+💎 Design Inspiration
+Apple iOS settings, YouTube mobile player, and Coursera mobile UX
+
+Touch-friendly, elegant, minimal, and accessible to all users
+
