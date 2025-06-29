@@ -16,6 +16,9 @@ import StudentCourses from "./pages/StudentCourses";
 import Unauthorized from "./pages/Unauthorized";
 import FeatureDemo from "./pages/FeatureDemo";
 import MonetizationDemo from "./pages/MonetizationDemo";
+import MobileAccessibilityDemo from "./pages/MobileAccessibilityDemo";
+import GamificationDemo from "./pages/GamificationDemo";
+import PeerHelpCenter from "./pages/PeerHelpCenter";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 const queryClient = new QueryClient();
@@ -58,6 +61,9 @@ const App = () => (
             />
             <Route path="/features" element={<FeatureDemo />} />
             <Route path="/monetization" element={<MonetizationDemo />} />
+            <Route path="/mobile-accessibility" element={<MobileAccessibilityDemo />} />
+            <Route path="/gamification" element={<GamificationDemo />} />
+            <Route path="/peer-help" element={<PeerHelpCenter />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
