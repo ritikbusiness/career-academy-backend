@@ -18,21 +18,12 @@ const SimpleHome = () => (
   </div>
 );
 
-const NotFound = () => (
-  <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-    <div className="text-center">
-      <h1 className="text-4xl font-bold text-gray-800">404</h1>
-      <p className="text-gray-600">Page not found</p>
-    </div>
-  </div>
-);
-
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<SimpleHome />} />
-        <Route path="*" element={<NotFound />} />
+        <Route path="*" element={<SimpleHome />} />
       </Routes>
     </BrowserRouter>
   </QueryClientProvider>
