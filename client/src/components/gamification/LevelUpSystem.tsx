@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Star, Zap, Crown } from 'lucide-react';
-import { Card } from '@/components/ui/card';
+import { Trophy, Star, Zap, Crown, Gift, Percent, BookOpen, Award } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 
@@ -9,6 +9,18 @@ interface UserLevel {
   currentXP: number;
   xpToNextLevel: number;
   totalXP: number;
+}
+
+interface LevelReward {
+  id: string;
+  name: string;
+  type: 'discount' | 'content' | 'badge' | 'certificate';
+  value: string;
+  description: string;
+  icon: React.ReactNode;
+  unlocked: boolean;
+  levelRequired: number;
+  discountCode?: string;
 }
 
 interface LevelBadge {
@@ -41,6 +53,51 @@ export function LevelUpSystem({ onLevelUp }: LevelUpSystemProps) {
   //   enabled: !!user
   // });
 
+  const rewards: LevelReward[] = [
+    {
+      id: 'welcome-discount',
+      name: '10% Off Next Course',
+      type: 'discount',
+      value: '10',
+      description: 'Get 10% discount on your next course purchase',
+      icon: <Percent className="w-4 h-4" />,
+      unlocked: userLevel.currentLevel >= 2,
+      levelRequired: 2,
+      discountCode: 'LEVEL2'
+    },
+    {
+      id: 'exclusive-content',
+      name: 'Exclusive Study Materials',
+      type: 'content',
+      value: 'premium',
+      description: 'Access to premium study guides and resources',
+      icon: <BookOpen className="w-4 h-4" />,
+      unlocked: userLevel.currentLevel >= 5,
+      levelRequired: 5
+    },
+    {
+      id: 'big-discount',
+      name: '25% Off Bundle Deal',
+      type: 'discount',
+      value: '25',
+      description: 'Huge savings on course bundles',
+      icon: <Gift className="w-4 h-4" />,
+      unlocked: userLevel.currentLevel >= 10,
+      levelRequired: 10,
+      discountCode: 'LEVEL10'
+    },
+    {
+      id: 'master-certificate',
+      name: 'Master Learner Certificate',
+      type: 'certificate',
+      value: 'master',
+      description: 'Official certificate of learning mastery',
+      icon: <Award className="w-4 h-4" />,
+      unlocked: userLevel.currentLevel >= 15,
+      levelRequired: 15
+    }
+  ];
+
   const badges: LevelBadge[] = [
     {
       id: 'first-steps',
@@ -55,7 +112,7 @@ export function LevelUpSystem({ onLevelUp }: LevelUpSystemProps) {
       name: 'Knowledge Seeker',
       description: 'Reach level 5',
       icon: <Trophy className="w-4 h-4" />,
-      unlocked: true,
+      unlocked: userLevel.currentLevel >= 5,
       xpRequired: 500
     },
     {
@@ -71,10 +128,13 @@ export function LevelUpSystem({ onLevelUp }: LevelUpSystemProps) {
       name: 'Master',
       description: 'Reach level 10',
       icon: <Crown className="w-4 h-4" />,
-      unlocked: false,
+      unlocked: userLevel.currentLevel >= 10,
       xpRequired: 2000
     }
   ];
+
+  const nextReward = rewards.find(reward => !reward.unlocked);
+  const nextXPGoal = nextReward ? (nextReward.levelRequired * 1000) - userLevel.totalXP : null;
 
   const progressPercentage = (userLevel.currentXP / userLevel.xpToNextLevel) * 100;
 
@@ -138,22 +198,22 @@ export function LevelUpSystem({ onLevelUp }: LevelUpSystemProps) {
       )}
 
       {/* Level Progress Card */}
-      <Card className="p-6 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border-2 border-blue-200 dark:border-blue-800">
+      <Card className="p-6 bg-gradient-to-r from-primary/5 to-secondary/5 border-2 border-primary/20">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+            <div className="w-12 h-12 bg-gradient-to-r from-primary to-primary/80 rounded-full flex items-center justify-center text-primary-foreground font-bold text-lg">
               {userLevel.currentLevel}
             </div>
             <div>
               <h3 className="text-lg font-semibold">Level {userLevel.currentLevel}</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-muted-foreground">
                 {userLevel.currentXP} / {userLevel.xpToNextLevel} XP
               </p>
             </div>
           </div>
           <div className="text-right">
-            <p className="text-sm text-gray-600 dark:text-gray-400">Total XP</p>
-            <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
+            <p className="text-sm text-muted-foreground">Total XP</p>
+            <p className="text-lg font-bold text-primary">
               {userLevel.totalXP.toLocaleString()}
             </p>
           </div>
@@ -166,9 +226,25 @@ export function LevelUpSystem({ onLevelUp }: LevelUpSystemProps) {
           </div>
           <Progress 
             value={progressPercentage} 
-            className="h-3 bg-gray-200 dark:bg-gray-700"
+            className="h-3"
           />
         </div>
+
+        {/* Next Reward Preview */}
+        {nextReward && (
+          <div className="mt-4 p-3 bg-gradient-to-r from-accent/50 to-accent/30 rounded-lg border border-accent">
+            <div className="flex items-center gap-2 mb-1">
+              <Gift className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">Next Reward at Level {nextReward.levelRequired}</span>
+            </div>
+            <p className="text-sm text-muted-foreground">{nextReward.name}</p>
+            {nextXPGoal && nextXPGoal > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {nextXPGoal.toLocaleString()} XP to go!
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Quick XP Gain Button (for demo) */}
         <div className="mt-4 flex gap-2">
@@ -187,49 +263,113 @@ export function LevelUpSystem({ onLevelUp }: LevelUpSystemProps) {
         </div>
       </Card>
 
-      {/* Badges Section */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Trophy className="w-5 h-5 text-yellow-500" />
-          Achievement Badges
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {badges.map((badge) => (
-            <div
-              key={badge.id}
-              className={`p-4 rounded-lg border-2 transition-all duration-300 ${
-                badge.unlocked
-                  ? 'bg-gradient-to-b from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-300 dark:border-yellow-700 shadow-lg'
-                  : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-60'
-              }`}
-            >
-              <div className="text-center">
-                <div
-                  className={`w-12 h-12 mx-auto mb-2 rounded-full flex items-center justify-center ${
-                    badge.unlocked
-                      ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white'
-                      : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400'
-                  }`}
-                >
-                  {badge.icon}
+      {/* Rewards Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Gift className="w-5 h-5 text-primary" />
+            Level Rewards
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {rewards.map((reward) => (
+              <div
+                key={reward.id}
+                className={`p-4 rounded-lg border-2 transition-all duration-300 ${
+                  reward.unlocked
+                    ? 'bg-gradient-to-b from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-300 dark:border-green-700'
+                    : 'bg-muted/50 border-border opacity-75'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      reward.unlocked
+                        ? 'bg-gradient-to-r from-green-500 to-green-600 text-white'
+                        : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {reward.icon}
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-sm mb-1">{reward.name}</h4>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      {reward.description}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      {reward.unlocked ? (
+                        <>
+                          <Badge variant="default" className="bg-green-500 text-white">
+                            Unlocked
+                          </Badge>
+                          {reward.discountCode && (
+                            <Badge variant="secondary" className="text-xs">
+                              Code: {reward.discountCode}
+                            </Badge>
+                          )}
+                        </>
+                      ) : (
+                        <Badge variant="outline" className="text-xs">
+                          Level {reward.levelRequired}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <h4 className="font-semibold text-sm mb-1">{badge.name}</h4>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                  {badge.description}
-                </p>
-                {badge.unlocked ? (
-                  <Badge variant="default" className="bg-green-500 text-white">
-                    Unlocked
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="text-xs">
-                    {badge.xpRequired} XP
-                  </Badge>
-                )}
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Badges Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Trophy className="w-5 h-5 text-amber-500" />
+            Achievement Badges
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {badges.map((badge) => (
+              <div
+                key={badge.id}
+                className={`p-4 rounded-lg border-2 transition-all duration-300 ${
+                  badge.unlocked
+                    ? 'bg-gradient-to-b from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-amber-300 dark:border-amber-700 shadow-lg'
+                    : 'bg-muted/50 border-border opacity-60'
+                }`}
+              >
+                <div className="text-center">
+                  <div
+                    className={`w-12 h-12 mx-auto mb-2 rounded-full flex items-center justify-center ${
+                      badge.unlocked
+                        ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white'
+                        : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {badge.icon}
+                  </div>
+                  <h4 className="font-semibold text-sm mb-1">{badge.name}</h4>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    {badge.description}
+                  </p>
+                  {badge.unlocked ? (
+                    <Badge variant="default" className="bg-green-500 text-white">
+                      Unlocked
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs">
+                      {badge.xpRequired} XP
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
       </Card>
     </div>
   );

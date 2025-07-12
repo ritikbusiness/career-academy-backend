@@ -50,6 +50,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         fullName: 'John Doe',
         email: email,
         role: 'student',
+        domain: 'Engineering',
+        branch: 'Computer Science',
+        year: '2024',
         createdAt: new Date().toISOString(),
       };
       
@@ -75,6 +78,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         fullName: 'John Doe',
         email: 'john@example.com',
         role: 'student',
+        domain: 'Engineering',
+        branch: 'Computer Science',
+        year: '2024',
         createdAt: new Date().toISOString(),
       };
       

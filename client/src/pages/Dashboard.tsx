@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import Header from '@/components/layout/Header';
 import { Link } from 'react-router-dom';
+import { LevelProgress } from '@/components/gamification/LevelProgress';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -13,42 +14,54 @@ const Dashboard = () => {
     switch (user?.role) {
       case 'student':
         return (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>My Courses</CardTitle>
-                <CardDescription>Continue your learning journey</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">0</p>
-                <p className="text-sm text-muted-foreground">Enrolled courses</p>
-                <Link to="/courses">
-                  <Button className="mt-4 w-full">Browse Courses</Button>
-                </Link>
-              </CardContent>
-            </Card>
+          <div className="space-y-6">
+            {/* Level Progress Section */}
+            <LevelProgress
+              currentLevel={5}
+              currentXP={750}
+              xpToNextLevel={1000}
+              totalXP={4750}
+              className="lg:col-span-2"
+            />
             
-            <Card>
-              <CardHeader>
-                <CardTitle>Progress</CardTitle>
-                <CardDescription>Your learning progress</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">0%</p>
-                <p className="text-sm text-muted-foreground">Overall completion</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>Certificates</CardTitle>
-                <CardDescription>Your achievements</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">0</p>
-                <p className="text-sm text-muted-foreground">Certificates earned</p>
-              </CardContent>
-            </Card>
+            {/* Dashboard Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>My Courses</CardTitle>
+                  <CardDescription>Continue your learning journey</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">0</p>
+                  <p className="text-sm text-muted-foreground">Enrolled courses</p>
+                  <Link to="/courses">
+                    <Button className="mt-4 w-full">Browse Courses</Button>
+                  </Link>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Course Progress</CardTitle>
+                  <CardDescription>Your learning progress</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">0%</p>
+                  <p className="text-sm text-muted-foreground">Overall completion</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Certificates</CardTitle>
+                  <CardDescription>Your achievements</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">0</p>
+                  <p className="text-sm text-muted-foreground">Certificates earned</p>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         );
       
