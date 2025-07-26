@@ -1,0 +1,299 @@
+
+
+You are building the complete backend for a Learning Management System called Desired Career Academy.
+Use Node.js (Express) with PostgreSQL (or MongoDB if preferred), and write modular clean APIs. Use MVC architecture and ensure all routes are RESTful.
+📚 Core LMS Features
+User Authentication
+
+
+Roles: student, instructor, admin
+
+
+JWT or session-based auth
+
+
+Signup/login/logout/reset password
+
+
+Course Management
+
+
+Admins & instructors can add/edit/delete courses
+
+
+Each course has:
+
+
+Title, description, tags, instructorId
+
+
+Lessons (video, text, or quiz)
+
+
+Video Hosting & Streaming
+
+
+Store video metadata (we’ll use AWS S3 for actual videos later)
+
+
+Secure playback links
+
+
+Live Classes (Optional WebRTC ready)
+
+
+Store meeting links (Google Meet/Zoom)
+
+
+Show countdown to next live session
+
+
+Quizzes & Assessments
+
+
+Quiz types: MCQ, coding, subjective
+
+
+Auto-score MCQs
+
+
+Store quiz attempts and scores
+
+
+Student Progress Tracking
+
+
+Track lesson completion
+
+
+Track total XP per student
+
+
+Progress percentage per course
+
+
+Payment Gateway (mock now)
+
+
+Model for Order, TransactionStatus
+
+
+Students can purchase courses (free/premium flag)
+
+
+Admin Dashboard
+
+
+Manage all users, payments, and courses
+
+
+View analytics: signups, top-performing courses, XP trends
+
+
+
+💬 Discussion + Q&A System
+Students can ask questions on topics
+
+
+Others can answer, vote, and earn XP
+
+
+Each answer should have:
+
+
+answerId, questionId, userId, content, createdAt
+
+
+Points System:
+
+
+Answer accepted = +20 XP
+
+
+Upvote = +5 XP, Downvote = -3 XP
+
+
+
+🧠 AI & Gamification Features (Next-Gen Add-ons)
+
+🔥 1. AI-Powered Answer Review
+Use DeepSeek or GPT API (mocked for now) to auto-score answers:
+Analyze grammar, clarity, and correctness
+
+
+Model:
+
+
+AIScore {
+  id,
+  answerId,
+  aiScore,
+  summaryComment
+}
+
+Attach score next to user-submitted answers (visible only to them)
+
+
+
+📊 2. Skill Tagging & Analytics
+Track XP earned per skill (e.g., DevOps, Python, etc.)
+Add skillTag to questions
+
+
+Model:
+
+
+SkillProgress {
+  userId,
+  skillTag,
+  totalXP
+}
+
+Dashboard:
+
+
+Pie chart of skill XP
+
+
+Weekly skill growth
+
+
+
+🎯 3. Missions & Daily Challenges
+Admins create missions like:
+
+
+"Answer 2 questions"
+
+
+"Earn 15 XP in DevOps"
+
+
+Students complete and claim XP
+
+
+Models:
+
+
+Mission {
+  id, title, description, xpReward
+}
+MissionProgress {
+  userId, missionId, isCompleted
+}
+
+
+📈 4. Answer Quality Tracker
+Track vote history for answers:
+Use for leaderboard, mentor selection
+
+
+Route: /api/quality/:userId
+
+
+Model:
+
+
+AnswerFeedback {
+  id, answerId, userId, voteType: 'up' | 'down'
+}
+
+
+🌐 5. Live Peer Collaboration
+Allow users to join real-time question rooms
+
+
+Basic API: /api/questions/:id/join
+
+
+Track active participants (mock WebSocket)
+
+
+
+🔔 6. Notification System
+Notify students on:
+Answer received
+
+
+XP gained
+
+
+Rank/level up
+
+
+Model:
+
+
+Notification {
+  id, userId, message, isRead
+}
+
+
+🔓 7. Smart Content Unlock
+Unlock special routes (like /api/unlock/mentor-status)
+
+
+Example unlock rules:
+
+
+1000+ XP + 20 answers given
+
+
+Check logic at route level
+
+
+
+🤖 8. AI Mentor Bot
+After 24 hours with no human answer, auto-post:
+
+
+"AI Suggested Answer" using DeepSeek/GPT
+
+
+Store answer with flag isAI: true
+
+
+
+📦 Summary of New Models
+Model
+Purpose
+AIScore
+AI-reviewed score + comment
+SkillProgress
+XP in each skill
+Mission
+Admin-created XP tasks
+MissionProgress
+Tracks student progress on missions
+AnswerFeedback
+Voting system
+Notification
+In-app alerts
+
+
+🧱 Stack & Practices
+Node.js + Express
+
+
+PostgreSQL preferred, but MongoDB is okay
+
+
+Modular routes (/api/auth, /api/answers, etc.)
+
+
+Use Prisma or Sequelize (for SQL) or Mongoose (for Mongo)
+
+
+Environment-ready (.env support)
+
+
+Ensure structure is easy to extend
+
+
+
+✨ Final Note: Build clean API endpoints. You don’t need frontend—just full backend logic with models, routes, and dummy data where necessary.
+This is for a production-grade LMS project called Desired Career Academy.
+
+💥 Let’s Go, Replit AI 💥
+"Now build it modular, clean, and scalable as if it's going to be used by 100,000 students worldwide."
+

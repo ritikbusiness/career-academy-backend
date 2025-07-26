@@ -659,3 +659,157 @@ export type InsertQuiz = z.infer<typeof insertQuizSchema>;
 export type Quiz = typeof quizzes.$inferSelect;
 export type InsertQuizAttempt = z.infer<typeof insertQuizAttemptSchema>;
 export type QuizAttempt = typeof quizAttempts.$inferSelect;
+
+// AI-POWERED BACKEND FEATURES
+
+// AI Answer Analysis & Scoring
+export const aiScores = pgTable("ai_scores", {
+  id: serial("id").primaryKey(), 
+  answerId: integer("answer_id").references(() => helpAnswers.id).notNull(),
+  aiScore: decimal("ai_score", { precision: 3, scale: 1 }).notNull(), // 0.0 to 10.0
+  summaryComment: text("summary_comment"),
+  grammarScore: decimal("grammar_score", { precision: 3, scale: 1 }),
+  clarityScore: decimal("clarity_score", { precision: 3, scale: 1 }),
+  correctnessScore: decimal("correctness_score", { precision: 3, scale: 1 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Skill Tracking & Analytics
+export const skillProgress = pgTable("skill_progress", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  skillTag: text("skill_tag").notNull(), // DevOps, Python, Frontend, etc.
+  totalXP: integer("total_xp").default(0),
+  questionsAnswered: integer("questions_answered").default(0),
+  averageRating: decimal("average_rating", { precision: 3, scale: 2 }).default('0'),
+  lastUpdated: timestamp("last_updated").defaultNow().notNull(),
+});
+
+// Missions & Daily Challenges
+export const missions = pgTable("missions", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  xpReward: integer("xp_reward").notNull(),
+  skillTag: text("skill_tag"), // Optional skill focus
+  missionType: text("mission_type", { enum: ['daily', 'weekly', 'special'] }).notNull().default('daily'),
+  requirements: json("requirements").$type<{type: string, count: number, skillTag?: string}>().notNull(),
+  isActive: boolean("is_active").default(true),
+  validFrom: timestamp("valid_from").defaultNow().notNull(),
+  validUntil: timestamp("valid_until"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const missionProgress = pgTable("mission_progress", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  missionId: integer("mission_id").references(() => missions.id).notNull(),
+  currentProgress: integer("current_progress").default(0),
+  targetProgress: integer("target_progress").notNull(),
+  isCompleted: boolean("is_completed").default(false),
+  completedAt: timestamp("completed_at"),
+  xpClaimed: boolean("xp_claimed").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Enhanced Answer Feedback System  
+export const answerFeedback = pgTable("answer_feedback", {
+  id: serial("id").primaryKey(),
+  answerId: integer("answer_id").references(() => helpAnswers.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  voteType: text("vote_type", { enum: ['up', 'down'] }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Live Peer Collaboration
+export const questionRooms = pgTable("question_rooms", {
+  id: serial("id").primaryKey(),
+  questionId: integer("question_id").references(() => helpQuestions.id).notNull(),
+  isActive: boolean("is_active").default(true),
+  participantCount: integer("participant_count").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const roomParticipants = pgTable("room_participants", {
+  id: serial("id").primaryKey(),
+  roomId: integer("room_id").references(() => questionRooms.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  lastActiveAt: timestamp("last_active_at").defaultNow().notNull(),
+});
+
+// Smart Notification System
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  type: text("type", { enum: ['xp_gained', 'answer_received', 'level_up', 'mission_complete', 'badge_earned'] }).notNull(),
+  isRead: boolean("is_read").default(false),
+  relatedId: integer("related_id"), // Answer ID, Mission ID, etc.
+  relatedType: text("related_type"), // 'answer', 'mission', 'course', etc.
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Smart Content Unlock System
+export const userUnlocks = pgTable("user_unlocks", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  unlockType: text("unlock_type").notNull(), // 'mentor_status', 'premium_content', etc.
+  unlockedAt: timestamp("unlocked_at").defaultNow().notNull(),
+  requirements: json("requirements").$type<{xp: number, answersGiven: number, rating: number}>(),
+});
+
+// AI Mentor Bot System
+export const aiMentorResponses = pgTable("ai_mentor_responses", {
+  id: serial("id").primaryKey(),
+  questionId: integer("question_id").references(() => helpQuestions.id).notNull(),
+  aiResponse: text("ai_response").notNull(),
+  confidence: decimal("confidence", { precision: 3, scale: 2 }).notNull(), // 0.00 to 1.00
+  triggerReason: text("trigger_reason").notNull(), // '24_hour_timeout', 'no_human_answers', etc.
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Enhanced AI Features Insert Schemas
+export const insertAIScoreSchema = createInsertSchema(aiScores).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSkillProgressSchema = createInsertSchema(skillProgress).omit({
+  id: true,
+  lastUpdated: true,
+});
+
+export const insertMissionSchema = createInsertSchema(missions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertMissionProgressSchema = createInsertSchema(missionProgress).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+});
+
+// AI Feature Types
+export type AIScore = typeof aiScores.$inferSelect;
+export type InsertAIScore = z.infer<typeof insertAIScoreSchema>;
+export type SkillProgress = typeof skillProgress.$inferSelect;
+export type InsertSkillProgress = z.infer<typeof insertSkillProgressSchema>;
+export type Mission = typeof missions.$inferSelect;
+export type InsertMission = z.infer<typeof insertMissionSchema>;
+export type MissionProgress = typeof missionProgress.$inferSelect;
+export type InsertMissionProgress = z.infer<typeof insertMissionProgressSchema>;
+export type AnswerFeedback = typeof answerFeedback.$inferSelect;
+export type QuestionRoom = typeof questionRooms.$inferSelect;
+export type RoomParticipant = typeof roomParticipants.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type UserUnlock = typeof userUnlocks.$inferSelect;
+export type AIMentorResponse = typeof aiMentorResponses.$inferSelect;
