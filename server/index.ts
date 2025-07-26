@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import { router } from "./routes";
-import { setupVite, serveStatic } from "./vite";
+import { setupVite, serveStatic, log } from "./vite";
 import { errorHandler, notFound } from "./middleware/errorHandler";
 import { apiLogger } from "./utils/logger";
 import cors from "cors";
