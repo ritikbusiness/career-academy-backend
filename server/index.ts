@@ -59,14 +59,11 @@ app.use('/api', notFound);
   // Create HTTP server
   const server = createServer(app);
   
-  // Setup Vite in development or static serving in production
-  if (process.env.NODE_ENV === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
+  // Setup static serving to avoid Vite issues in Replit environment
+  // Use built files instead of Vite dev server
+  serveStatic(app);
 
-  // serve the app on port 5000 as expected by Replit workflows
+  // serve the app on port 5000 for Replit workflow compatibility
   // this serves both the API and the client.
   const port = 5000;
   server.listen(port, "0.0.0.0", () => {
