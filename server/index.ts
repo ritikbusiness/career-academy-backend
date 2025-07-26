@@ -66,7 +66,7 @@ app.use('/api', notFound);
     serveStatic(app);
   }
 
-  // serve the app on port 5000 for Replit compatibility
+  // serve the app on port 5000 as expected by Replit workflows
   // this serves both the API and the client.
   const port = 5000;
   server.listen(port, "0.0.0.0", () => {
