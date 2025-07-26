@@ -1,96 +1,342 @@
-import type { Express } from "express";
-import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { aiService } from "./services/aiService";
+import express from 'express';
+import { AuthController } from './controllers/authController';
+import { CourseController } from './controllers/courseController';
+import { GamificationController } from './controllers/gamificationController';
+import { PeerHelpController } from './controllers/peerHelpController';
+import { AnalyticsController } from './controllers/analyticsController';
+import { AIController } from './controllers/aiController';
+import { AdminController } from './controllers/adminController';
+import { authenticate, authorize, refreshToken } from './middleware/auth';
+import { validateRequest, registerSchema, loginSchema, createCourseSchema, createQuestionSchema, createAnswerSchema, idParamSchema, paginationSchema } from './middleware/validator';
+import { generalLimiter, authLimiter, aiLimiter } from './middleware/rateLimiter';
+import { asyncHandler } from './middleware/errorHandler';
+import { AIService } from './services/aiService';
 
-export async function registerRoutes(app: Express): Promise<Server> {
-  // AI-powered features routes
-  
-  // AI Lesson Summarizer
-  app.post("/api/ai/summarize-lesson", async (req, res) => {
-    try {
-      const { lessonContent, lessonTitle } = req.body;
-      
-      if (!lessonContent || !lessonTitle) {
-        return res.status(400).json({ 
-          error: "Missing required fields: lessonContent and lessonTitle" 
-        });
-      }
+const router = express.Router();
 
-      const summary = await aiService.generateLessonSummary(lessonContent, lessonTitle);
-      res.json(summary);
-    } catch (error) {
-      console.error('Error in lesson summarizer:', error);
-      res.status(500).json({ 
-        error: "Failed to generate lesson summary" 
-      });
-    }
+// Apply general rate limiting to all routes
+router.use(generalLimiter.middleware);
+
+// Health check
+router.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
   });
+});
 
-  // AI Practice Questions Generator
-  app.post("/api/ai/generate-questions", async (req, res) => {
-    try {
-      const { lessonContent, lessonTitle, count = 5 } = req.body;
-      
-      if (!lessonContent || !lessonTitle) {
-        return res.status(400).json({ 
-          error: "Missing required fields: lessonContent and lessonTitle" 
-        });
-      }
+// AI Service health check
+router.get('/health/ai', asyncHandler(AIController.healthCheck));
 
-      const questions = await aiService.generatePracticeQuestions(lessonContent, lessonTitle, count);
-      res.json({ questions });
-    } catch (error) {
-      console.error('Error in question generator:', error);
-      res.status(500).json({ 
-        error: "Failed to generate practice questions" 
-      });
-    }
-  });
+// ===== AUTHENTICATION ROUTES =====
+router.post('/auth/register', 
+  authLimiter.middleware,
+  validateRequest({ body: registerSchema }),
+  asyncHandler(AuthController.register)
+);
 
-  // AI Study Buddy Chat
-  app.post("/api/ai/study-buddy", async (req, res) => {
-    try {
-      const { question, lessonContext, conversationHistory = [] } = req.body;
-      
-      if (!question || !lessonContext) {
-        return res.status(400).json({ 
-          error: "Missing required fields: question and lessonContext" 
-        });
-      }
+router.post('/auth/login',
+  authLimiter.middleware,
+  validateRequest({ body: loginSchema }),
+  asyncHandler(AuthController.login)
+);
 
-      const response = await aiService.chatWithStudyBuddy(question, lessonContext, conversationHistory);
-      res.json({ response });
-    } catch (error) {
-      console.error('Error in study buddy chat:', error);
-      res.status(500).json({ 
-        error: "Failed to get study buddy response" 
-      });
-    }
-  });
+router.post('/auth/refresh',
+  authenticate,
+  asyncHandler(refreshToken)
+);
 
-  // AI Skill Gap Analyzer
-  app.post("/api/ai/analyze-skill-gaps", async (req, res) => {
-    try {
-      const { completedLessons, quizResults, targetSkills } = req.body;
-      
-      if (!completedLessons || !quizResults || !targetSkills) {
-        return res.status(400).json({ 
-          error: "Missing required fields: completedLessons, quizResults, and targetSkills" 
-        });
-      }
+router.post('/auth/logout',
+  authenticate,
+  asyncHandler(AuthController.logout)
+);
 
-      const skillGaps = await aiService.analyzeSkillGaps(completedLessons, quizResults, targetSkills);
-      res.json({ skillGaps });
-    } catch (error) {
-      console.error('Error in skill gap analysis:', error);
-      res.status(500).json({ 
-        error: "Failed to analyze skill gaps" 
-      });
-    }
-  });
+router.get('/auth/profile',
+  authenticate,
+  asyncHandler(AuthController.getProfile)
+);
 
-  const httpServer = createServer(app);
+router.put('/auth/profile',
+  authenticate,
+  asyncHandler(AuthController.updateProfile)
+);
 
-  return httpServer;
-}
+router.put('/auth/change-password',
+  authenticate,
+  asyncHandler(AuthController.changePassword)
+);
+
+router.get('/auth/dashboard',
+  authenticate,
+  asyncHandler(AuthController.getDashboard)
+);
+
+// ===== COURSE ROUTES =====
+router.get('/courses',
+  validateRequest({ query: paginationSchema }),
+  asyncHandler(CourseController.getCourses)
+);
+
+router.get('/courses/:id',
+  validateRequest({ params: idParamSchema }),
+  asyncHandler(CourseController.getCourse)
+);
+
+router.post('/courses',
+  authenticate,
+  authorize(['instructor', 'admin']),
+  validateRequest({ body: createCourseSchema }),
+  asyncHandler(CourseController.createCourse)
+);
+
+router.put('/courses/:id',
+  authenticate,
+  authorize(['instructor', 'admin']),
+  validateRequest({ params: idParamSchema }),
+  asyncHandler(CourseController.updateCourse)
+);
+
+router.delete('/courses/:id',
+  authenticate,
+  authorize(['instructor', 'admin']),
+  validateRequest({ params: idParamSchema }),
+  asyncHandler(CourseController.deleteCourse)
+);
+
+router.post('/courses/:id/enroll',
+  authenticate,
+  authorize(['student']),
+  validateRequest({ params: idParamSchema }),
+  asyncHandler(CourseController.enrollInCourse)
+);
+
+router.get('/my-courses',
+  authenticate,
+  authorize(['student']),
+  asyncHandler(CourseController.getUserCourses)
+);
+
+router.get('/instructor-courses',
+  authenticate,
+  authorize(['instructor', 'admin']),
+  asyncHandler(CourseController.getInstructorCourses)
+);
+
+router.post('/courses/:courseId/modules',
+  authenticate,
+  authorize(['instructor', 'admin']),
+  asyncHandler(CourseController.addModule)
+);
+
+router.post('/modules/:moduleId/lessons',
+  authenticate,
+  authorize(['instructor', 'admin']),
+  asyncHandler(CourseController.addLesson)
+);
+
+router.put('/courses/:courseId/lessons/:lessonId/complete',
+  authenticate,
+  authorize(['student']),
+  asyncHandler(CourseController.completeLesson)
+);
+
+router.get('/courses/:id/analytics',
+  authenticate,
+  authorize(['instructor', 'admin']),
+  validateRequest({ params: idParamSchema }),
+  asyncHandler(CourseController.getCourseAnalytics)
+);
+
+// ===== GAMIFICATION ROUTES =====
+router.get('/gamification/stats',
+  authenticate,
+  asyncHandler(GamificationController.getUserStats)
+);
+
+router.get('/gamification/leaderboard',
+  asyncHandler(GamificationController.getLeaderboard)
+);
+
+router.post('/gamification/award-xp',
+  authenticate,
+  authorize(['admin']),
+  asyncHandler(GamificationController.awardXP)
+);
+
+router.put('/gamification/streak',
+  authenticate,
+  asyncHandler(GamificationController.updateLearningStreak)
+);
+
+router.get('/gamification/achievements',
+  asyncHandler(GamificationController.getAvailableAchievements)
+);
+
+router.post('/gamification/check-achievements',
+  authenticate,
+  asyncHandler(GamificationController.checkAchievements)
+);
+
+router.get('/gamification/xp-history',
+  authenticate,
+  asyncHandler(GamificationController.getXPHistory)
+);
+
+// ===== PEER HELP CENTER ROUTES =====
+router.get('/help/categories',
+  asyncHandler(PeerHelpController.getCategories)
+);
+
+router.get('/help/questions',
+  validateRequest({ query: paginationSchema }),
+  asyncHandler(PeerHelpController.getQuestions)
+);
+
+router.get('/help/questions/:id',
+  validateRequest({ params: idParamSchema }),
+  asyncHandler(PeerHelpController.getQuestion)
+);
+
+router.post('/help/questions',
+  authenticate,
+  validateRequest({ body: createQuestionSchema }),
+  asyncHandler(PeerHelpController.createQuestion)
+);
+
+router.post('/help/questions/:questionId/answers',
+  authenticate,
+  validateRequest({ body: createAnswerSchema }),
+  asyncHandler(PeerHelpController.createAnswer)
+);
+
+router.put('/help/answers/:answerId/rate',
+  authenticate,
+  asyncHandler(PeerHelpController.rateAnswer)
+);
+
+router.get('/help/leaderboard',
+  asyncHandler(PeerHelpController.getHelpLeaderboard)
+);
+
+router.get('/help/my-stats',
+  authenticate,
+  asyncHandler(PeerHelpController.getUserHelpStats)
+);
+
+router.post('/help/questions/:questionId/vote',
+  authenticate,
+  asyncHandler(PeerHelpController.voteOnQuestion)
+);
+
+router.post('/help/answers/:answerId/vote',
+  authenticate,
+  asyncHandler(PeerHelpController.voteOnAnswer)
+);
+
+router.put('/help/answers/:answerId/accept',
+  authenticate,
+  asyncHandler(PeerHelpController.acceptAnswer)
+);
+
+router.get('/help/search',
+  asyncHandler(PeerHelpController.searchQuestions)
+);
+
+// ===== ANALYTICS ROUTES =====
+router.get('/analytics/user',
+  authenticate,
+  asyncHandler(AnalyticsController.getUserAnalytics)
+);
+
+router.get('/analytics/course/:courseId',
+  authenticate,
+  authorize(['instructor', 'admin']),
+  validateRequest({ params: idParamSchema }),
+  asyncHandler(AnalyticsController.getCourseAnalytics)
+);
+
+router.get('/analytics/dashboard',
+  authenticate,
+  asyncHandler(AnalyticsController.getDashboardAnalytics)
+);
+
+router.post('/analytics/activity',
+  authenticate,
+  asyncHandler(AnalyticsController.recordActivity)
+);
+
+router.get('/analytics/progress-report',
+  authenticate,
+  asyncHandler(AnalyticsController.getProgressReport)
+);
+
+router.get('/analytics/learning-patterns',
+  authenticate,
+  asyncHandler(AnalyticsController.getLearningPatterns)
+);
+
+// ===== AI-POWERED FEATURES =====
+router.post('/ai/lesson-summary',
+  authenticate,
+  aiLimiter.middleware,
+  asyncHandler(AIController.generateLessonSummary)
+);
+
+router.post('/ai/practice-questions',
+  authenticate,
+  aiLimiter.middleware,
+  asyncHandler(AIController.generatePracticeQuestions)
+);
+
+router.post('/ai/study-buddy/chat',
+  authenticate,
+  aiLimiter.middleware,
+  asyncHandler(AIController.studyBuddyChat)
+);
+
+router.post('/ai/skill-gap-analysis',
+  authenticate,
+  aiLimiter.middleware,
+  asyncHandler(AIController.analyzeSkillGaps)
+);
+
+router.post('/ai/generate-content',
+  authenticate,
+  authorize(['instructor', 'admin']),
+  aiLimiter.middleware,
+  asyncHandler(AIController.generateLessonContent)
+);
+
+// ===== ADMIN ROUTES =====
+router.get('/admin/stats',
+  authenticate,
+  authorize(['admin']),
+  asyncHandler(AdminController.getSystemStats)
+);
+
+router.put('/admin/users/role',
+  authenticate,
+  authorize(['admin']),
+  asyncHandler(AdminController.updateUserRole)
+);
+
+router.put('/admin/config',
+  authenticate,
+  authorize(['admin']),
+  asyncHandler(AdminController.updateSystemConfig)
+);
+
+router.post('/admin/moderate',
+  authenticate,
+  authorize(['admin']),
+  asyncHandler(AdminController.moderateContent)
+);
+
+router.get('/admin/export-analytics',
+  authenticate,
+  authorize(['admin']),
+  asyncHandler(AdminController.exportAnalytics)
+);
+
+export { router };

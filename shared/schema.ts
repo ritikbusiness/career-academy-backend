@@ -323,6 +323,258 @@ export const insertForumReplySchema = createInsertSchema(forumReplies).omit({
   updatedAt: true,
 });
 
+// GAMIFICATION SYSTEM
+export const userStats = pgTable("user_stats", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull().unique(),
+  totalXP: integer("total_xp").default(0),
+  level: integer("level").default(1),
+  streak: integer("streak").default(0),
+  longestStreak: integer("longest_streak").default(0),
+  lastActivityDate: timestamp("last_activity_date"),
+  coursesCompleted: integer("courses_completed").default(0),
+  lessonsCompleted: integer("lessons_completed").default(0),
+  quizzesCompleted: integer("quizzes_completed").default(0),
+  helpfulAnswers: integer("helpful_answers").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const achievements = pgTable("achievements", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  icon: text("icon"),
+  xpReward: integer("xp_reward").default(0),
+  category: text("category", { enum: ['learning', 'social', 'streak', 'milestone', 'special'] }).notNull(),
+  rarity: text("rarity", { enum: ['common', 'rare', 'epic', 'legendary'] }).default('common'),
+  requirements: json("requirements").$type<{ [key: string]: any }>().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const userAchievements = pgTable("user_achievements", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  achievementId: integer("achievement_id").references(() => achievements.id).notNull(),
+  earnedAt: timestamp("earned_at").defaultNow().notNull(),
+});
+
+export const leaderboards = pgTable("leaderboards", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  category: text("category", { enum: ['overall', 'weekly', 'monthly', 'course_specific'] }).notNull(),
+  courseId: integer("course_id").references(() => courses.id),
+  xp: integer("xp").notNull(),
+  rank: integer("rank").notNull(),
+  period: text("period"), // e.g., "2024-01", "2024-W01"
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// PEER HELP CENTER
+export const helpCategories = pgTable("help_categories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  icon: text("icon"),
+  color: text("color"),
+  sortOrder: integer("sort_order").default(0),
+});
+
+export const helpQuestions = pgTable("help_questions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  categoryId: integer("category_id").references(() => helpCategories.id).notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  tags: json("tags").$type<string[]>().default([]),
+  upvotes: integer("upvotes").default(0),
+  downvotes: integer("downvotes").default(0),
+  viewCount: integer("view_count").default(0),
+  status: text("status", { enum: ['open', 'answered', 'closed'] }).default('open'),
+  bountyXP: integer("bounty_xp").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const helpAnswers = pgTable("help_answers", {
+  id: serial("id").primaryKey(),
+  questionId: integer("question_id").references(() => helpQuestions.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  content: text("content").notNull(),
+  xpRating: integer("xp_rating"), // 1-10, only question author can set
+  starRating: decimal("star_rating", { precision: 3, scale: 2 }), // 1-5 stars, community average
+  starRatingCount: integer("star_rating_count").default(0),
+  isAccepted: boolean("is_accepted").default(false),
+  upvotes: integer("upvotes").default(0),
+  downvotes: integer("downvotes").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const answerStarRatings = pgTable("answer_star_ratings", {
+  id: serial("id").primaryKey(),
+  answerId: integer("answer_id").references(() => helpAnswers.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  rating: integer("rating").notNull(), // 1-5 stars
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// XP TRANSACTIONS
+export const xpTransactions = pgTable("xp_transactions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  amount: integer("amount").notNull(),
+  reason: text("reason").notNull(),
+  sourceType: text("source_type", { enum: ['lesson_completion', 'quiz_completion', 'helpful_answer', 'achievement', 'streak_bonus', 'course_completion'] }).notNull(),
+  sourceId: integer("source_id"), // ID of the source (lesson, quiz, answer, etc.)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// LEARNING ANALYTICS
+export const learningAnalytics = pgTable("learning_analytics", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  courseId: integer("course_id").references(() => courses.id),
+  lessonId: integer("lesson_id").references(() => lessons.id),
+  activityType: text("activity_type", { enum: ['lesson_view', 'lesson_complete', 'quiz_attempt', 'note_taken', 'bookmark_added', 'forum_post', 'video_pause', 'video_seek'] }).notNull(),
+  duration: integer("duration"), // in seconds
+  progress: decimal("progress", { precision: 5, scale: 2 }), // percentage
+  metadata: json("metadata").$type<{ [key: string]: any }>().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const weeklyLearningStats = pgTable("weekly_learning_stats", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  weekStart: timestamp("week_start").notNull(),
+  lessonsCompleted: integer("lessons_completed").default(0),
+  quizzesCompleted: integer("quizzes_completed").default(0),
+  totalStudyTime: integer("total_study_time").default(0), // in minutes
+  xpEarned: integer("xp_earned").default(0),
+  streakDays: integer("streak_days").default(0),
+});
+
+// SUBSCRIPTION & MONETIZATION
+export const subscriptionPlans = pgTable("subscription_plans", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  interval: text("interval", { enum: ['monthly', 'yearly'] }).notNull(),
+  features: json("features").$type<string[]>().default([]),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const userSubscriptions = pgTable("user_subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  planId: integer("plan_id").references(() => subscriptionPlans.id).notNull(),
+  status: text("status", { enum: ['active', 'cancelled', 'expired', 'paused'] }).notNull(),
+  currentPeriodStart: timestamp("current_period_start").notNull(),
+  currentPeriodEnd: timestamp("current_period_end").notNull(),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const discountCoupons = pgTable("discount_coupons", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  description: text("description"),
+  discountType: text("discount_type", { enum: ['percentage', 'fixed_amount'] }).notNull(),
+  discountValue: decimal("discount_value", { precision: 10, scale: 2 }).notNull(),
+  maxUses: integer("max_uses"),
+  usedCount: integer("used_count").default(0),
+  expiresAt: timestamp("expires_at"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const couponUsage = pgTable("coupon_usage", {
+  id: serial("id").primaryKey(),
+  couponId: integer("coupon_id").references(() => discountCoupons.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  courseId: integer("course_id").references(() => courses.id),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).notNull(),
+  usedAt: timestamp("used_at").defaultNow().notNull(),
+});
+
+// CERTIFICATES
+export const certificates = pgTable("certificates", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  courseId: integer("course_id").references(() => courses.id).notNull(),
+  certificateType: text("certificate_type", { enum: ['basic', 'verified', 'premium'] }).notNull(),
+  certificateUrl: text("certificate_url"),
+  verificationCode: text("verification_code").unique(),
+  issuedAt: timestamp("issued_at").defaultNow().notNull(),
+});
+
+// Insert schemas for new tables
+export const insertUserStatsSchema = createInsertSchema(userStats).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAchievementSchema = createInsertSchema(achievements).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertHelpQuestionSchema = createInsertSchema(helpQuestions).omit({
+  id: true,
+  upvotes: true,
+  downvotes: true,
+  viewCount: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertHelpAnswerSchema = createInsertSchema(helpAnswers).omit({
+  id: true,
+  xpRating: true,
+  starRating: true,
+  starRatingCount: true,
+  isAccepted: true,
+  upvotes: true,
+  downvotes: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertDiscountCouponSchema = createInsertSchema(discountCoupons).omit({
+  id: true,
+  usedCount: true,
+  createdAt: true,
+});
+
+// Additional Type exports for new gamification and enterprise tables
+export type UserStats = typeof userStats.$inferSelect;
+export type InsertUserStats = z.infer<typeof insertUserStatsSchema>;
+export type Achievement = typeof achievements.$inferSelect;
+export type InsertAchievement = z.infer<typeof insertAchievementSchema>;
+export type HelpQuestion = typeof helpQuestions.$inferSelect;
+export type InsertHelpQuestion = z.infer<typeof insertHelpQuestionSchema>;
+export type HelpAnswer = typeof helpAnswers.$inferSelect;
+export type InsertHelpAnswer = z.infer<typeof insertHelpAnswerSchema>;
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+export type InsertSubscriptionPlan = z.infer<typeof insertSubscriptionPlanSchema>;
+export type DiscountCoupon = typeof discountCoupons.$inferSelect;
+export type InsertDiscountCoupon = z.infer<typeof insertDiscountCouponSchema>;
+export type HelpCategory = typeof helpCategories.$inferSelect;
+export type XpTransaction = typeof xpTransactions.$inferSelect;
+export type LearningAnalytics = typeof learningAnalytics.$inferSelect;
+export type WeeklyLearningStats = typeof weeklyLearningStats.$inferSelect;
+export type Certificate = typeof certificates.$inferSelect;
+
 export const insertStudyGroupSchema = createInsertSchema(studyGroups).omit({
   id: true,
   memberCount: true,
