@@ -4,7 +4,7 @@ import { CourseController } from './controllers/courseController';
 import { GamificationController } from './controllers/gamificationController';
 import { PeerHelpController } from './controllers/peerHelpController';
 import { AnalyticsController } from './controllers/analyticsController';
-import { AIController } from './controllers/aiController';
+import * as AIController from './controllers/aiController';
 import { AdminController } from './controllers/adminController';
 import { authenticate, authorize, refreshToken } from './middleware/auth';
 import { validateRequest, registerSchema, loginSchema, createCourseSchema, createQuestionSchema, createAnswerSchema, idParamSchema, paginationSchema } from './middleware/validator';
@@ -306,6 +306,72 @@ router.post('/ai/generate-content',
   authorize(['instructor', 'admin']),
   aiLimiter.middleware,
   asyncHandler(AIController.generateLessonContent)
+);
+
+// ===== ENHANCED AI-POWERED BACKEND FEATURES =====
+
+// AI Answer Analysis & Scoring
+router.post('/ai/analyze-answer/:answerId',
+  authenticate,
+  aiLimiter.middleware,
+  validateRequest({ params: idParamSchema }),
+  asyncHandler(AIController.analyzeAnswer)
+);
+
+// Skill Progress Analytics
+router.get('/ai/skill-analytics/:userId',
+  authenticate,
+  validateRequest({ params: idParamSchema }),
+  asyncHandler(AIController.getSkillAnalytics)
+);
+
+router.post('/ai/skill-progress',
+  authenticate,
+  asyncHandler(AIController.updateSkillProgress)
+);
+
+// Mission Management
+router.post('/ai/missions',
+  authenticate,
+  authorize(['admin']),
+  asyncHandler(AIController.createMission)
+);
+
+router.get('/ai/missions/:userId',
+  authenticate,
+  validateRequest({ params: idParamSchema }),
+  asyncHandler(AIController.getUserMissions)
+);
+
+router.post('/ai/missions/progress',
+  authenticate,
+  asyncHandler(AIController.updateMissionProgress)
+);
+
+router.post('/ai/missions/claim-reward',
+  authenticate,
+  asyncHandler(AIController.claimMissionReward)
+);
+
+// Smart Content Unlock System
+router.get('/ai/unlock-status/:userId/:unlockType',
+  authenticate,
+  asyncHandler(AIController.checkUnlockStatus)
+);
+
+// AI Mentor Bot
+router.post('/ai/mentor/:questionId',
+  authenticate,
+  aiLimiter.middleware,
+  validateRequest({ params: idParamSchema }),
+  asyncHandler(AIController.triggerAIMentor)
+);
+
+// Answer Quality Tracking
+router.get('/ai/answer-quality/:userId',
+  authenticate,
+  validateRequest({ params: idParamSchema }),
+  asyncHandler(AIController.getAnswerQualityStats)
 );
 
 // ===== ADMIN ROUTES =====
