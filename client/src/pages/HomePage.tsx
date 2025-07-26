@@ -8,8 +8,8 @@ const HomePage = () => {
       <header className="border-b bg-white/80 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-2">
-            <div className="h-8 w-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold">AI</div>
-            <h1 className="text-2xl font-bold text-gray-900">EduAI LMS</h1>
+            <div className="h-8 w-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold">DC</div>
+            <h1 className="text-2xl font-bold text-gray-900">DesiredCareerAcademy</h1>
           </div>
           <div className="space-x-4">
             <Link to="/login" className="px-4 py-2 text-gray-600 hover:text-gray-900">
@@ -26,15 +26,15 @@ const HomePage = () => {
       <section className="py-20 px-4">
         <div className="container mx-auto text-center">
           <div className="mb-4 inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-            🚀 Enterprise-Grade Learning Platform
+            🚀 Professional Career Development Platform
           </div>
           <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-            AI-Powered Learning
-            <span className="text-blue-600"> Management System</span>
+            DesiredCareerAcademy
+            <span className="text-blue-600"> Learning Platform</span>
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-            Transform education with our comprehensive LMS featuring AI-driven personalization, 
-            gamification, peer collaboration, and advanced analytics for enhanced learning outcomes.
+            Your premier destination for professional skill development and career advancement. 
+            Master in-demand skills with expert-led courses and hands-on projects.
           </p>
           <div className="space-x-4">
             <Link to="/register" className="inline-block px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
