@@ -1,0 +1,228 @@
+You're building a full LMS platform called Desired Career Academy using Node.js + Express for the backend and React (TypeScript) on the frontend (in Replit). You want to upgrade video handling to a modern, scalable system:
+
+🧩 Goal:
+Replace current video URL input with a secure upload, HLS conversion, and Cloudflare-streamed system:
+Instructor Upload Flow:
+Instructor uploads video from dashboard.
+
+
+Backend receives and stores file temporarily.
+
+
+FFmpeg converts video into HLS format (m3u8 + ts segments).
+
+
+Uploads all HLS files to Backblaze B2 bucket.
+
+
+Video is served via Cloudflare CDN with free egress.
+
+
+Backend generates signed video URLs for access protection.
+
+
+
+🛠️ Required Tech Stack:
+Node.js, Express, multer, FFmpeg
+
+
+Backblaze B2 SDK, crypto (for signed URLs)
+
+
+React + TypeScript
+
+
+.env for secrets (e.g., B2 keys, Cloudflare domain, HMAC secret)
+
+
+
+🔧 Backend Tasks (Replit Backend)
+Install these packages:
+
+
+npm install multer backblaze-b2 dotenv
+
+Add video upload controller:
+ 📄 server/controllers/videoUploadController.ts
+
+
+import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
+import { uploadToB2, generateSignedUrl } from '../utils/b2Utils';
+import { convertToHLS } from '../utils/ffmpegUtils';
+
+const upload = multer({ dest: 'temp/' });
+
+export const handleSecureVideoUpload = [
+  upload.single('video'),
+  async (req, res) => {
+    try {
+      const localPath = req.file.path;
+      const baseName = Date.now() + '-' + req.file.originalname.replace(/\s+/g, '_');
+      const hlsDir = `temp/hls/${baseName}`;
+
+      await convertToHLS(localPath, hlsDir);
+
+      const uploadedBasePath = `videos/${baseName}`;
+      const m3u8Url = await uploadToB2(hlsDir, uploadedBasePath);
+
+      fs.rmSync('temp', { recursive: true, force: true });
+
+      const signed = generateSignedUrl(m3u8Url);
+      res.status(200).json({ url: signed });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+];
+
+
+Add Backblaze upload + signed URL utility:
+ 📄 server/utils/b2Utils.ts
+
+
+import { B2 } from 'backblaze-b2';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+
+const b2 = new B2({
+  applicationKeyId: process.env.B2_KEY_ID!,
+  applicationKey: process.env.B2_APP_KEY!,
+});
+
+export async function uploadToB2(localDir: string, remoteBasePath: string): Promise<string> {
+  await b2.authorize();
+  const files = fs.readdirSync(localDir);
+  let m3u8Url = '';
+
+  for (const file of files) {
+    const filePath = path.join(localDir, file);
+    const fileData = fs.readFileSync(filePath);
+    const fileName = `${remoteBasePath}/${file}`;
+
+    const { data } = await b2.getUploadUrl({ bucketId: process.env.B2_BUCKET_ID! });
+    await b2.uploadFile({
+      uploadUrl: data.uploadUrl,
+      uploadAuthToken: data.authorizationToken,
+      fileName,
+      data: fileData,
+    });
+
+    if (file.endsWith('.m3u8')) {
+      m3u8Url = `${process.env.CLOUDFLARE_BASE_URL}/${fileName}`;
+    }
+  }
+
+  return m3u8Url;
+}
+
+export function generateSignedUrl(url: string): string {
+  const expiry = Math.floor(Date.now() / 1000) + 6 * 3600; // 6 hours
+  const token = crypto.createHmac('sha256', process.env.SIGNED_SECRET!).update(url + expiry).digest('hex');
+  return `${url}?token=${token}&expires=${expiry}`;
+}
+
+
+Add FFmpeg HLS conversion:
+ 📄 server/utils/ffmpegUtils.ts
+
+
+import { spawn } from 'child_process';
+import fs from 'fs';
+
+export function convertToHLS(inputPath: string, outputDir: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    fs.mkdirSync(outputDir, { recursive: true });
+
+    const args = [
+      '-i', inputPath,
+      '-profile:v', 'baseline',
+      '-level', '3.0',
+      '-start_number', '0',
+      '-hls_time', '10',
+      '-hls_list_size', '0',
+      '-f', 'hls',
+      `${outputDir}/index.m3u8`,
+    ];
+
+    const ffmpeg = spawn('ffmpeg', args);
+    ffmpeg.stderr.on('data', (data) => console.log(data.toString()));
+    ffmpeg.on('close', (code) => code === 0 ? resolve() : reject(new Error('FFmpeg failed')));
+  });
+}
+
+
+Update API routes
+ 📄 server/routes.ts
+
+
+import { handleSecureVideoUpload } from './controllers/videoUploadController';
+router.post('/api/upload-secure', handleSecureVideoUpload);
+
+
+🔧 Frontend (React + TypeScript)
+📄 client/src/components/instructor/CourseContentManager.tsx
+<input
+  type="file"
+  accept="video/*"
+  onChange={async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("video", file);
+
+    const res = await fetch("/api/upload-secure", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+    updateLesson(module.id, lesson.id, { videoUrl: data.url });
+  }}
+/>
+
+
+🔐 .env Configuration (Replit Secrets)
+B2_KEY_ID=your_b2_key_id
+B2_APP_KEY=your_b2_app_key
+B2_BUCKET_ID=your_b2_bucket_id
+CLOUDFLARE_BASE_URL=https://cdn.yourdomain.com
+SIGNED_SECRET=random_long_secret
+
+
+✅ Final Results
+🎞️ Uploads any video file from instructors.
+
+
+⚙️ Transcodes to HLS for adaptive streaming.
+
+
+☁️ Uploads to B2, streamed via Cloudflare (0 egress fee).
+
+
+🔐 URL access is time-limited and signed (e.g. 6 hours).
+
+
+📱 Supports seeking, bitrate switching, low buffering.
+
+
+
+👇 You Can Now Ask Replit AI:
+✅ Replit Prompt:
+Implement secure video upload and streaming for my LMS app (Desired Career Academy) using Backblaze B2 + Cloudflare CDN. Backend is Express (Node.js), frontend is React + TypeScript.
+
+Features:
+- Upload video from frontend using `<input type="file" />`
+- Backend receives the file, stores temporarily
+- Convert video to HLS using FFmpeg
+- Upload HLS segments to B2 bucket
+- Serve via Cloudflare-proxied bucket URL
+- Generate signed URLs to protect videos
+
+I want to restrict viewing to enrolled users only. Stream HLS via <video> player or HLS.js.
+
+
+
