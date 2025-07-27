@@ -1,12 +1,13 @@
 import { 
   users, courses, modules, lessons, enrollments, userStats, achievements, userAchievements,
   helpCategories, helpQuestions, helpAnswers, xpTransactions, learningAnalytics,
-  subscriptionPlans, userSubscriptions, discountCoupons,
+  subscriptionPlans, userSubscriptions, discountCoupons, instructorInvites,
   type User, type InsertUser, type Course, type InsertCourse, type Module, type InsertModule,
   type Lesson, type InsertLesson, type Enrollment, type InsertEnrollment,
   type UserStats, type InsertUserStats, type Achievement, type InsertAchievement,
   type HelpQuestion, type InsertHelpQuestion, type HelpAnswer, type InsertHelpAnswer,
-  type HelpCategory, type XpTransaction, type LearningAnalytics
+  type HelpCategory, type XpTransaction, type LearningAnalytics, type InstructorInvite,
+  type InsertInstructorInvite
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, like, sql, count } from "drizzle-orm";
@@ -73,6 +74,16 @@ export interface IStorage {
   // Leaderboards
   getLeaderboard?(category: string, limit?: number): Promise<any[]>;
   updateLeaderboard?(userId: number, category: string, xp: number): Promise<void>;
+
+  // Instructor Invites (Admin only)
+  createInstructorInvite?(invite: InsertInstructorInvite): Promise<InstructorInvite>;
+  getInstructorInviteByToken?(token: string): Promise<InstructorInvite | undefined>;
+  getInstructorInviteByEmail?(email: string): Promise<InstructorInvite | undefined>;
+  getAllInstructorInvites?(): Promise<InstructorInvite[]>;
+  markInstructorInviteAsUsed?(inviteId: number, usedBy: number): Promise<void>;
+  revokeInstructorInvite?(inviteId: number): Promise<boolean>;
+  getCoursesByInstructor?(instructorId: number): Promise<Course[]>;
+  updateUser?(userId: number, updates: Partial<User>): Promise<User>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -452,6 +463,84 @@ export class DatabaseStorage implements IStorage {
 
   async updateLeaderboard(userId: number, category: string, xp: number): Promise<void> {
     // TODO: Implement leaderboard updates
+  }
+  // Instructor Invites methods
+  async createInstructorInvite(invite: InsertInstructorInvite): Promise<InstructorInvite> {
+    const [newInvite] = await db
+      .insert(instructorInvites)
+      .values(invite)
+      .returning();
+    return newInvite;
+  }
+
+  async getInstructorInviteByToken(token: string): Promise<InstructorInvite | undefined> {
+    const [invite] = await db
+      .select()
+      .from(instructorInvites)
+      .where(eq(instructorInvites.token, token));
+    return invite || undefined;
+  }
+
+  async getInstructorInviteByEmail(email: string): Promise<InstructorInvite | undefined> {
+    const [invite] = await db
+      .select()
+      .from(instructorInvites)
+      .where(and(
+        eq(instructorInvites.email, email),
+        eq(instructorInvites.isUsed, false)
+      ))
+      .orderBy(desc(instructorInvites.createdAt));
+    return invite || undefined;
+  }
+
+  async getAllInstructorInvites(): Promise<InstructorInvite[]> {
+    return await db
+      .select()
+      .from(instructorInvites)
+      .orderBy(desc(instructorInvites.createdAt));
+  }
+
+  async markInstructorInviteAsUsed(inviteId: number, usedBy: number): Promise<void> {
+    await db
+      .update(instructorInvites)
+      .set({
+        isUsed: true,
+        usedBy,
+        usedAt: new Date()
+      })
+      .where(eq(instructorInvites.id, inviteId));
+  }
+
+  async revokeInstructorInvite(inviteId: number): Promise<boolean> {
+    const result = await db
+      .update(instructorInvites)
+      .set({
+        expiresAt: new Date() // Set expiry to now
+      })
+      .where(and(
+        eq(instructorInvites.id, inviteId),
+        eq(instructorInvites.isUsed, false)
+      ))
+      .returning();
+    
+    return result.length > 0;
+  }
+
+  async getCoursesByInstructor(instructorId: number): Promise<Course[]> {
+    return await db
+      .select()
+      .from(courses)
+      .where(eq(courses.instructorId, instructorId))
+      .orderBy(desc(courses.createdAt));
+  }
+
+  async updateUser(userId: number, updates: Partial<User>): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
   }
 }
 

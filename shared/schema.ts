@@ -28,6 +28,19 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Instructor Invites table for admin-controlled instructor access
+export const instructorInvites = pgTable("instructor_invites", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  email: text("email").notNull(),
+  invitedBy: integer("invited_by").references(() => users.id).notNull(),
+  isUsed: boolean("is_used").default(false).notNull(),
+  usedBy: integer("used_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+});
+
 // Courses table
 export const courses = pgTable("courses", {
   id: serial("id").primaryKey(),
@@ -311,6 +324,21 @@ export const instructorProfileUpdateSchema = createInsertSchema(users).pick({
   qualifications: true,
   avatar: true,
 });
+
+// Instructor invite schemas
+export const createInstructorInviteSchema = createInsertSchema(instructorInvites).pick({
+  email: true,
+});
+
+export const validateInstructorInviteSchema = z.object({
+  token: z.string().min(1, "Token is required"),
+});
+
+// Type exports
+export type User = typeof users.$inferSelect;
+export type InsertUser = typeof users.$inferInsert;
+export type InstructorInvite = typeof instructorInvites.$inferSelect;
+export type InsertInstructorInvite = typeof instructorInvites.$inferInsert;
 
 export const insertCourseSchema = createInsertSchema(courses).omit({
   id: true,

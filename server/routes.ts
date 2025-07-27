@@ -6,6 +6,7 @@ import { PeerHelpController } from './controllers/peerHelpController';
 import { AnalyticsController } from './controllers/analyticsController';
 import * as AIController from './controllers/aiController';
 import { AdminController } from './controllers/adminController';
+import { InstructorInviteController } from './controllers/instructorInviteController';
 import { handleSecureVideoUpload, verifyVideoAccess, updateLessonVideo, regenerateVideoUrl } from './controllers/videoUploadController';
 import { authenticate, authorize, refreshToken } from './middleware/auth';
 import { validateRequest, registerSchema, loginSchema, createCourseSchema, createQuestionSchema, createAnswerSchema, idParamSchema, paginationSchema } from './middleware/validator';
@@ -74,9 +75,13 @@ router.get('/auth/dashboard',
 );
 
 // ===== INSTRUCTOR AUTHENTICATION ROUTES =====
+router.get('/auth/instructor/validate-invite',
+  asyncHandler(AuthController.validateInstructorInvite)
+);
+
 router.post('/auth/instructor/signup',
   authLimiter.middleware,
-  asyncHandler(AuthController.instructorSignup)
+  asyncHandler(AuthController.instructorSignupWithToken)
 );
 
 router.put('/auth/instructor/profile',
@@ -89,6 +94,29 @@ router.get('/auth/instructor/profile',
   authenticate,
   authorize(['instructor']),
   asyncHandler(AuthController.getInstructorProfile)
+);
+
+// ===== INSTRUCTOR INVITE ROUTES (Admin Only) =====
+router.post('/admin/instructor-invites',
+  authenticate,
+  authorize(['admin']),
+  asyncHandler(InstructorInviteController.generateInvite)
+);
+
+router.get('/admin/instructor-invites',
+  authenticate,
+  authorize(['admin']),
+  asyncHandler(InstructorInviteController.listInvites)
+);
+
+router.delete('/admin/instructor-invites/:inviteId',
+  authenticate,
+  authorize(['admin']),
+  asyncHandler(InstructorInviteController.revokeInvite)
+);
+
+router.get('/instructor-invites/:token',
+  asyncHandler(InstructorInviteController.getInviteByToken)
 );
 
 // ===== COURSE ROUTES =====
