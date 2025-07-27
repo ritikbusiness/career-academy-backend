@@ -1,0 +1,46 @@
+Hey Replit Assistant, please carefully fix and upgrade the permissions system in this project without breaking or disturbing any existing user login, registration, or student functionality.
+
+Here’s what needs to be done:
+
+🚨 0. Recover Admin Account & Features:
+- We had already created an admin user previously. Please make sure that account is still recognized as admin.
+- Recover any admin-specific dashboard or access features that were deleted or broken.
+- If needed, check the database for an existing user with `role: "admin"` and enable their admin panel access again.
+
+🛠️ 1. Ensure Admin Role Works:
+- Check if the logged-in user has `role: "admin"` before showing admin-only features.
+- Middleware or route guards should protect all `/admin/*` routes.
+- Admin should never lose access once marked as an admin.
+
+📊 2. Restore Admin Dashboard:
+- Create or restore a clean dashboard for admin at `/admin/dashboard`.
+- Admin should see exclusive tools like: instructor approval, user management, and system settings.
+- Frontend must conditionally show the admin dashboard only to users with `role === "admin"`.
+
+👨‍🏫 3. Instructor Approval System (New Feature):
+- Instructors should sign up and be marked with `role: "instructor"` and `status: "pending"` by default.
+- Admin dashboard must include a section to:
+  - View all pending instructors
+  - Approve or reject them
+  - Change their status to `approved`
+- Only instructors with status `approved` should be allowed to access instructor routes and features.
+
+🔐 4. Instructor Signup Security:
+- Instructor signup must be protected with an **invite link or unique token** (created only by admin).
+- Anyone trying to sign up as instructor without a valid invite should be shown an error or redirected.
+- Admin must have a way to generate these instructor invite links/tokens.
+
+🛡️ 5. Secure Route Access:
+- All `/admin/*` routes must be protected so only admin users can access them.
+- All instructor-only routes must check:
+  - `role === "instructor"`
+  - AND `status === "approved"`
+
+✅ 6. Don’t Break Existing Functionality:
+- Please DO NOT disturb any part of the current:
+  - Student signup/login
+  - Course access
+  - Normal user dashboard
+- Just enhance and recover the admin and instructor roles cleanly.
+
+Thank you! Please handle all this carefully.

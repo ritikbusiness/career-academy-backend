@@ -6,7 +6,10 @@ export interface AuthRequest extends Request {
   user?: {
     id: number;
     username: string;
+    fullName: string;
+    email: string;
     role: 'student' | 'instructor' | 'admin';
+    instructorStatus?: 'pending' | 'approved' | 'rejected';
   };
 }
 
@@ -29,7 +32,10 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
     req.user = {
       id: user.id,
       username: user.username,
-      role: user.role as 'student' | 'instructor' | 'admin'
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role as 'student' | 'instructor' | 'admin',
+      instructorStatus: user.instructorStatus as 'pending' | 'approved' | 'rejected' | undefined
     };
 
     next();
@@ -51,6 +57,45 @@ export const authorize = (roles: string[]) => {
 
     next();
   };
+};
+
+// Enhanced authorization for approved instructors only
+export const authorizeApprovedInstructor = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  // Admins can access everything
+  if (req.user.role === 'admin') {
+    return next();
+  }
+
+  // Check instructor role and approval status
+  if (req.user.role !== 'instructor') {
+    return res.status(403).json({ error: 'Instructor access required' });
+  }
+
+  if (req.user.instructorStatus !== 'approved') {
+    return res.status(403).json({ 
+      error: 'Instructor approval pending',
+      message: 'Your instructor account is pending approval by an administrator.'
+    });
+  }
+
+  next();
+};
+
+// Admin-only authorization
+export const authorizeAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  next();
 };
 
 // Instructors can only access their own content

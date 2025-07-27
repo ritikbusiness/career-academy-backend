@@ -9,6 +9,11 @@ export interface User {
   year?: string;
   avatar?: string;
   createdAt: string;
+  // Instructor specific fields
+  bio?: string;
+  expertise?: string[];
+  qualifications?: string[];
+  instructorStatus?: 'pending' | 'approved' | 'rejected';
 }
 
 export interface AuthState {

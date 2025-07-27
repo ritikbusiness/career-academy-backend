@@ -5,13 +5,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, BookOpen, Users, DollarSign } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { Navigate } from 'react-router-dom';
 import Header from '@/components/layout/Header';
 import CourseForm from '@/components/instructor/CourseForm';
 import CourseContentManager from '@/components/instructor/CourseContentManager';
+import InstructorPendingMessage from '@/components/instructor/InstructorPendingMessage';
 import { Course, Module } from '@/types/course';
 
 const InstructorDashboard = () => {
   const { user } = useAuth();
+
+  // Redirect if not instructor
+  if (!user || user.role !== 'instructor') {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  // Show pending message if instructor not approved
+  if (user.instructorStatus !== 'approved') {
+    return <InstructorPendingMessage />;
+  }
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [courseModules, setCourseModules] = useState<{ [courseId: string]: Module[] }>({});
