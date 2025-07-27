@@ -6,6 +6,7 @@ import { PeerHelpController } from './controllers/peerHelpController';
 import { AnalyticsController } from './controllers/analyticsController';
 import * as AIController from './controllers/aiController';
 import { AdminController } from './controllers/adminController';
+import { handleSecureVideoUpload, verifyVideoAccess, updateLessonVideo, regenerateVideoUrl } from './controllers/videoUploadController';
 import { authenticate, authorize, refreshToken } from './middleware/auth';
 import { validateRequest, registerSchema, loginSchema, createCourseSchema, createQuestionSchema, createAnswerSchema, idParamSchema, paginationSchema } from './middleware/validator';
 import { generalLimiter, authLimiter, aiLimiter } from './middleware/rateLimiter';
@@ -403,6 +404,29 @@ router.get('/admin/export-analytics',
   authenticate,
   authorize(['admin']),
   asyncHandler(AdminController.exportAnalytics)
+);
+
+// ===== VIDEO UPLOAD ROUTES =====
+router.post('/upload/video',
+  authenticate,
+  authorize(['instructor', 'admin']),
+  handleSecureVideoUpload
+);
+
+router.get('/video/verify',
+  authenticate,
+  verifyVideoAccess
+);
+
+router.put('/lessons/:lessonId/video',
+  authenticate,
+  authorize(['instructor', 'admin']),
+  updateLessonVideo
+);
+
+router.post('/video/regenerate-url',
+  authenticate,
+  regenerateVideoUrl
 );
 
 export { router };
