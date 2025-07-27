@@ -1,10 +1,10 @@
 /// <reference path="../types/backblaze-b2.d.ts" />
-import { B2 } from 'backblaze-b2';
+import B2 from 'backblaze-b2';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
-const b2 = new B2({
+const b2 = B2({
   applicationKeyId: process.env.B2_KEY_ID!,
   applicationKey: process.env.B2_APP_KEY!,
 });
