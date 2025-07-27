@@ -1,3 +1,8 @@
+import dotenv from 'dotenv';
+// Load environment variables
+dotenv.config({ path: '.env.local' });
+dotenv.config();
+
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import { router } from "./routes";

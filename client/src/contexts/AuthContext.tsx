@@ -43,22 +43,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     setAuthState(prev => ({ ...prev, isLoading: true }));
     
-    // Mock API call - replace with actual API
     try {
-      const mockUser: User = {
-        id: '1',
-        fullName: 'John Doe',
-        email: email,
-        role: 'student',
-        domain: 'Engineering',
-        branch: 'Computer Science',
-        year: '2024',
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username: email, password }),
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Login failed');
+      }
+      
+      const user: User = {
+        id: result.data.user.id.toString(),
+        fullName: result.data.user.fullName,
+        email: result.data.user.email,
+        role: result.data.user.role,
+        avatar: result.data.user.avatar,
         createdAt: new Date().toISOString(),
+        instructorStatus: result.data.user.instructorStatus,
       };
       
-      localStorage.setItem('lms_user', JSON.stringify(mockUser));
+      localStorage.setItem('lms_user', JSON.stringify(user));
+      localStorage.setItem('token', result.data.token);
+      
       setAuthState({
-        user: mockUser,
+        user: user,
         isAuthenticated: true,
         isLoading: false,
       });
@@ -98,6 +112,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     localStorage.removeItem('lms_user');
+    localStorage.removeItem('token');
     setAuthState({
       user: null,
       isAuthenticated: false,

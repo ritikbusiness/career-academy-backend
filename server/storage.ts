@@ -84,6 +84,19 @@ export interface IStorage {
   revokeInstructorInvite?(inviteId: number): Promise<boolean>;
   getCoursesByInstructor?(instructorId: number): Promise<Course[]>;
   updateUser?(userId: number, updates: Partial<User>): Promise<User>;
+  
+  // Admin management methods
+  getPendingInstructors?(): Promise<User[]>;
+  getAllInstructors?(): Promise<User[]>;
+  getPlatformStats?(): Promise<{
+    totalUsers: number;
+    totalStudents: number; 
+    totalInstructors: number;
+    pendingInstructors: number;
+    approvedInstructors: number;
+    totalCourses: number;
+    totalEnrollments: number;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -541,6 +554,54 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return user;
+  }
+
+  // Admin management methods
+  async getPendingInstructors(): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(and(
+        eq(users.role, 'instructor'),
+        eq(users.instructorStatus, 'pending')
+      ))
+      .orderBy(desc(users.createdAt));
+  }
+
+  async getAllInstructors(): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(eq(users.role, 'instructor'))
+      .orderBy(desc(users.createdAt));
+  }
+
+  async getPlatformStats(): Promise<{
+    totalUsers: number;
+    totalStudents: number; 
+    totalInstructors: number;
+    pendingInstructors: number;
+    approvedInstructors: number;
+    totalCourses: number;
+    totalEnrollments: number;
+  }> {
+    const [totalUsersResult] = await db.select({ count: count() }).from(users);
+    const [totalStudentsResult] = await db.select({ count: count() }).from(users).where(eq(users.role, 'student'));
+    const [totalInstructorsResult] = await db.select({ count: count() }).from(users).where(eq(users.role, 'instructor'));
+    const [pendingInstructorsResult] = await db.select({ count: count() }).from(users).where(and(eq(users.role, 'instructor'), eq(users.instructorStatus, 'pending')));
+    const [approvedInstructorsResult] = await db.select({ count: count() }).from(users).where(and(eq(users.role, 'instructor'), eq(users.instructorStatus, 'approved')));
+    const [totalCoursesResult] = await db.select({ count: count() }).from(courses);
+    const [totalEnrollmentsResult] = await db.select({ count: count() }).from(enrollments);
+
+    return {
+      totalUsers: totalUsersResult.count,
+      totalStudents: totalStudentsResult.count,
+      totalInstructors: totalInstructorsResult.count,
+      pendingInstructors: pendingInstructorsResult.count,
+      approvedInstructors: approvedInstructorsResult.count,
+      totalCourses: totalCoursesResult.count,
+      totalEnrollments: totalEnrollmentsResult.count
+    };
   }
 }
 

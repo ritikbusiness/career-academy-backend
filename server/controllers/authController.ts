@@ -419,13 +419,12 @@ export class AuthController {
       // Hash password
       const hashedPassword = await hashPassword(instructorData.password);
       
-      // Create instructor with approved status (since they have a valid invite)
+      // Create instructor with pending status (admin approval required)
       const newInstructor = await storage.createUser({
         ...instructorData,
         password: hashedPassword,
         role: 'instructor',
-        instructorStatus: 'approved',
-        verificationDate: new Date()
+        instructorStatus: 'pending'
       });
 
       // Mark invite as used
@@ -452,7 +451,7 @@ export class AuthController {
       
       res.status(201).json({
         success: true,
-        message: 'Instructor registration completed successfully',
+        message: 'Instructor registration submitted. Your account is pending admin approval.',
         data: {
           user: {
             id: newInstructor.id,

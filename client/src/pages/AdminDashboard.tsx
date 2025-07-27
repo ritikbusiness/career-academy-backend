@@ -6,10 +6,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Shield, Users, Settings, BarChart3, Mail, LogOut } from 'lucide-react';
 import InstructorInvitePanel from '../components/admin/InstructorInvitePanel';
+import InstructorApprovalPanel from '../components/admin/InstructorApprovalPanel';
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState('invites');
+  const [activeTab, setActiveTab] = useState('approvals');
 
   // Redirect if not admin
   if (!user || user.role !== 'admin') {
@@ -103,7 +104,11 @@ const AdminDashboard = () => {
 
         {/* Admin Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="approvals" data-testid="tab-approvals">
+              <Users className="w-4 h-4 mr-2" />
+              Instructor Approvals
+            </TabsTrigger>
             <TabsTrigger value="invites" data-testid="tab-invites">
               <Mail className="w-4 h-4 mr-2" />
               Instructor Invites
@@ -121,6 +126,10 @@ const AdminDashboard = () => {
               Settings
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="approvals" className="mt-6">
+            <InstructorApprovalPanel />
+          </TabsContent>
 
           <TabsContent value="invites" className="mt-6">
             <InstructorInvitePanel />

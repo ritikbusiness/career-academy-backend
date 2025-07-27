@@ -8,7 +8,7 @@ import * as AIController from './controllers/aiController';
 import { AdminController } from './controllers/adminController';
 import { InstructorInviteController } from './controllers/instructorInviteController';
 import { handleSecureVideoUpload, verifyVideoAccess, updateLessonVideo, regenerateVideoUrl } from './controllers/videoUploadController';
-import { authenticate, authorize, refreshToken } from './middleware/auth';
+import { authenticate, authorize, authorizeApprovedInstructor, authorizeAdmin, refreshToken } from './middleware/auth';
 import { validateRequest, registerSchema, loginSchema, createCourseSchema, createQuestionSchema, createAnswerSchema, idParamSchema, paginationSchema } from './middleware/validator';
 import { generalLimiter, authLimiter, aiLimiter } from './middleware/rateLimiter';
 import { asyncHandler } from './middleware/errorHandler';
@@ -86,13 +86,13 @@ router.post('/auth/instructor/signup',
 
 router.put('/auth/instructor/profile',
   authenticate,
-  authorize(['instructor']),
+  authorizeApprovedInstructor,
   asyncHandler(AuthController.updateInstructorProfile)
 );
 
 router.get('/auth/instructor/profile',
   authenticate,
-  authorize(['instructor']),
+  authorizeApprovedInstructor,
   asyncHandler(AuthController.getInstructorProfile)
 );
 
@@ -117,6 +117,43 @@ router.delete('/admin/instructor-invites/:inviteId',
 
 router.get('/instructor-invites/:token',
   asyncHandler(InstructorInviteController.getInviteByToken)
+);
+
+// ===== ADMIN MANAGEMENT ROUTES =====
+router.get('/admin/instructors/pending',
+  authenticate,
+  authorizeAdmin,
+  asyncHandler(AdminController.getPendingInstructors)
+);
+
+router.get('/admin/instructors',
+  authenticate,
+  authorizeAdmin,
+  asyncHandler(AdminController.getAllInstructors)
+);
+
+router.post('/admin/instructors/:instructorId/approve',
+  authenticate,
+  authorizeAdmin,
+  asyncHandler(AdminController.approveInstructor)
+);
+
+router.post('/admin/instructors/:instructorId/reject',
+  authenticate,
+  authorizeAdmin,
+  asyncHandler(AdminController.rejectInstructor)
+);
+
+router.post('/admin/instructors/:instructorId/reset',
+  authenticate,
+  authorizeAdmin,
+  asyncHandler(AdminController.resetInstructorStatus)
+);
+
+router.get('/admin/stats',
+  authenticate,
+  authorizeAdmin,
+  asyncHandler(AdminController.getPlatformStats)
 );
 
 // ===== COURSE ROUTES =====
