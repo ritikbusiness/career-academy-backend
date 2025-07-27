@@ -12,6 +12,7 @@ import GamificationDemo from './pages/GamificationDemo';
 import MonetizationDemo from './pages/MonetizationDemo';
 import MobileAccessibilityDemo from './pages/MobileAccessibilityDemo';
 import PeerHelpCenter from './pages/PeerHelpCenter';
+import AdminDashboard from './pages/AdminDashboard';
 import NotFound from './pages/NotFound';
 import Unauthorized from './pages/Unauthorized';
 import LoginForm from './components/auth/LoginForm';
@@ -44,6 +45,7 @@ function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/courses" element={<StudentCourses />} />
               <Route path="/instructor" element={<InstructorDashboard />} />
+              <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/features" element={<FeatureDemo />} />
               <Route path="/gamification" element={<GamificationDemo />} />
               <Route path="/monetization" element={<MonetizationDemo />} />
