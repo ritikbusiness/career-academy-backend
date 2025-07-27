@@ -4,7 +4,7 @@ import { hashPassword, comparePassword } from '../utils/helpers';
 import { generateToken, AuthRequest } from '../middleware/auth';
 import { securityLogger, logger } from '../utils/logger';
 import { createValidationError, createAuthError, createConflictError, AppError } from '../middleware/errorHandler';
-import { insertUserSchema } from '@shared/schema';
+import { insertUserSchema, instructorSignupSchema, instructorProfileUpdateSchema } from '@shared/schema';
 
 export class AuthController {
   // User registration
@@ -50,7 +50,7 @@ export class AuthController {
       // Generate JWT token
       const token = generateToken(newUser.id);
 
-      securityLogger.authSuccess(newUser.id, newUser.username, req.ip);
+      securityLogger.authSuccess(newUser.id, newUser.username, req.ip || 'unknown');
       
       res.status(201).json({
         success: true,
@@ -88,14 +88,14 @@ export class AuthController {
       // Find user
       const user = await storage.getUserByUsername(username);
       if (!user) {
-        securityLogger.authFailure(username, req.ip, 'User not found');
+        securityLogger.authFailure(username, req.ip || 'unknown', 'User not found');
         throw createAuthError('Invalid credentials');
       }
 
       // Check password
       const isValidPassword = await comparePassword(password, user.password);
       if (!isValidPassword) {
-        securityLogger.authFailure(username, req.ip, 'Invalid password');
+        securityLogger.authFailure(username, req.ip || 'unknown', 'Invalid password');
         throw createAuthError('Invalid credentials');
       }
 
@@ -105,7 +105,7 @@ export class AuthController {
       // Generate token
       const token = generateToken(user.id);
 
-      securityLogger.authSuccess(user.id, user.username, req.ip);
+      securityLogger.authSuccess(user.id, user.username, req.ip || 'unknown');
 
       res.json({
         success: true,
@@ -228,7 +228,7 @@ export class AuthController {
       // Verify current password
       const isValidPassword = await comparePassword(currentPassword, user.password);
       if (!isValidPassword) {
-        securityLogger.authFailure(user.username, req.ip, 'Invalid current password');
+        securityLogger.authFailure(user.username, req.ip || 'unknown', 'Invalid current password');
         throw createAuthError('Current password is incorrect');
       }
 
@@ -238,7 +238,7 @@ export class AuthController {
       // Update password
       await storage.updateUserPassword?.(userId, hashedNewPassword);
 
-      securityLogger.authSuccess(userId, user.username, req.ip);
+      securityLogger.authSuccess(userId, user.username, req.ip || 'unknown');
 
       res.json({
         success: true,
@@ -333,6 +333,143 @@ export class AuthController {
     } catch (error) {
       logger.error('Get dashboard error:', error);
       throw createValidationError('Failed to get dashboard data');
+    }
+  }
+
+  // Instructor registration with verification
+  static async instructorSignup(req: Request, res: Response) {
+    try {
+      const instructorData = instructorSignupSchema.parse(req.body);
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByUsername(instructorData.username);
+      if (existingUser) {
+        throw createConflictError('Username already exists');
+      }
+
+      const existingEmail = await storage.getUserByEmail?.(instructorData.email);
+      if (existingEmail) {
+        throw createConflictError('Email already exists');
+      }
+
+      // Hash password
+      const hashedPassword = await hashPassword(instructorData.password);
+      
+      // Create instructor with pending status
+      const newInstructor = await storage.createUser({
+        ...instructorData,
+        password: hashedPassword,
+        role: 'instructor',
+        instructorStatus: 'pending'
+      });
+
+      // Initialize user stats
+      await storage.createUserStats?.({
+        userId: newInstructor.id,
+        totalXP: 0,
+        level: 1,
+        streak: 0,
+        longestStreak: 0,
+        lastActivityDate: new Date(),
+        coursesCompleted: 0,
+        lessonsCompleted: 0,
+        quizzesCompleted: 0,
+        helpfulAnswers: 0
+      });
+
+      // Generate JWT token
+      const token = generateToken(newInstructor.id);
+
+      securityLogger.authSuccess(newInstructor.id, newInstructor.username, req.ip || 'unknown');
+      
+      res.status(201).json({
+        success: true,
+        message: 'Instructor registration submitted for review',
+        data: {
+          user: {
+            id: newInstructor.id,
+            username: newInstructor.username,
+            fullName: newInstructor.fullName,
+            email: newInstructor.email,
+            role: newInstructor.role,
+            instructorStatus: newInstructor.instructorStatus,
+            avatar: newInstructor.avatar
+          },
+          token
+        }
+      });
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      logger.error('Instructor registration error:', error);
+      throw createValidationError('Instructor registration failed');
+    }
+  }
+
+  // Update instructor profile
+  static async updateInstructorProfile(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user!.id;
+      const updateData = instructorProfileUpdateSchema.parse(req.body);
+
+      // Verify user is an instructor
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'instructor') {
+        throw createAuthError('Access denied: Instructor role required');
+      }
+
+      // Update instructor profile
+      const updatedInstructor = await storage.updateUser(userId, updateData);
+
+      res.json({
+        success: true,
+        message: 'Instructor profile updated successfully',
+        data: {
+          user: updatedInstructor
+        }
+      });
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      logger.error('Update instructor profile error:', error);
+      throw createValidationError('Failed to update instructor profile');
+    }
+  }
+
+  // Get instructor profile with additional data
+  static async getInstructorProfile(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user!.id;
+      
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'instructor') {
+        throw createAuthError('Access denied: Instructor role required');
+      }
+
+      // Get instructor's courses
+      const courses = await storage.getCoursesByInstructor?.(userId) || [];
+      
+      // Get instructor stats
+      const userStats = await storage.getUserStats?.(userId);
+
+      res.json({
+        success: true,
+        data: {
+          profile: user,
+          courses,
+          stats: userStats,
+          totalStudents: courses.reduce((sum, course) => sum + (course.enrolledCount || 0), 0),
+          totalCourses: courses.length
+        }
+      });
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      logger.error('Get instructor profile error:', error);
+      throw createValidationError('Failed to get instructor profile');
     }
   }
 }

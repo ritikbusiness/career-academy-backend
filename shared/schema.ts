@@ -15,6 +15,16 @@ export const users = pgTable("users", {
   branch: text("branch"),
   year: text("year"),
   avatar: text("avatar"),
+  // Instructor-specific fields
+  instructorStatus: text("instructor_status", { enum: ['pending', 'approved', 'rejected'] }),
+  expertiseAreas: json("expertise_areas").$type<string[]>().default([]),
+  bio: text("bio"),
+  credentialsUrl: text("credentials_url"),
+  teachingExperience: integer("teaching_experience"),
+  linkedinProfile: text("linkedin_profile"),
+  personalWebsite: text("personal_website"),
+  qualifications: json("qualifications").$type<string[]>().default([]),
+  verificationDate: timestamp("verification_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -270,6 +280,35 @@ export const insertUserSchema = createInsertSchema(users).pick({
   domain: true,
   branch: true,
   year: true,
+  avatar: true,
+  instructorStatus: true,
+  expertiseAreas: true,
+  bio: true,
+  credentialsUrl: true,
+  teachingExperience: true,
+  linkedinProfile: true,
+  personalWebsite: true,
+  qualifications: true,
+});
+
+// Instructor-specific schemas
+export const instructorSignupSchema = insertUserSchema.extend({
+  expertiseAreas: z.array(z.string()).min(1, "At least one expertise area is required"),
+  bio: z.string().min(50, "Bio must be at least 50 characters"),
+  teachingExperience: z.number().min(0, "Teaching experience must be 0 or greater"),
+  qualifications: z.array(z.string()).min(1, "At least one qualification is required"),
+  linkedinProfile: z.string().url().optional(),
+  personalWebsite: z.string().url().optional(),
+});
+
+export const instructorProfileUpdateSchema = createInsertSchema(users).pick({
+  fullName: true,
+  bio: true,
+  expertiseAreas: true,
+  teachingExperience: true,
+  linkedinProfile: true,
+  personalWebsite: true,
+  qualifications: true,
   avatar: true,
 });
 

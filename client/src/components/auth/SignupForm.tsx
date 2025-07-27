@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -58,12 +59,11 @@ const SignupForm = () => {
         description: `Welcome to Desired Career Academy as ${formData.role}!`,
       });
       
-      // Navigate based on role
+      // For instructor role, redirect to detailed instructor signup
       if (formData.role === 'instructor') {
-        navigate('/instructor');
-      } else if (formData.role === 'admin') {
-        navigate('/dashboard');
+        navigate('/instructor-signup');
       } else {
+        // For students, proceed with regular onboarding
         navigate('/onboarding');
       }
     } catch (error) {
@@ -145,6 +145,18 @@ const SignupForm = () => {
                 onChange={handleInputChange}
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="role">I want to join as</Label>
+              <Select value={formData.role} onValueChange={(value) => setFormData(prev => ({ ...prev, role: value as 'student' | 'instructor' | 'admin' }))}>
+                <SelectTrigger data-testid="select-role">
+                  <SelectValue placeholder="Select your role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="student">Student - Learn new skills</SelectItem>
+                  <SelectItem value="instructor">Instructor - Teach and share knowledge</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
