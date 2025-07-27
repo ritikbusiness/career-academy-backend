@@ -1,0 +1,222 @@
+
+# 🚀 THE ULTIMATE REPLIT AI PROMPT - WORLD-CLASS LMS SYSTEM MISSION
+
+## Build a PRODUCTION-READY Learning Management System called "DesiredCareerAcademy"
+
+**CONTEXT:** You are building the complete backend + frontend for a Learning Management System called "Desired Career Academy" using Node.js, Express for the backend, React + TypeScript for frontend, with AI-powered features using DeepSeek API.
+
+**CURRENT STATUS:** The system is 95% complete with advanced features like AI tutoring, gamification, peer help, video streaming, but MISSING critical instructor registration functionality.
+
+---
+
+## 🎯 IMMEDIATE CRITICAL MISSION:
+
+### 1. **FIX MISSING INSTRUCTOR SIGNUP SYSTEM**
+The system currently only has student login/signup. You MUST implement:
+
+**A) Create Complete Instructor Registration Flow:**
+- Multi-step instructor onboarding form with profile verification
+- Subject expertise selection with skill validation
+- Portfolio/credentials upload system
+- Admin approval workflow for instructor verification
+- Instructor dashboard with course creation tools
+
+**B) Fix Authentication System:**
+- Add role-based signup selection (Student vs Instructor vs Admin)
+- Implement proper role-based access control
+- Create instructor-specific protected routes
+- Add instructor verification status management
+
+**C) Update Frontend Components:**
+- Modify existing LoginForm.tsx and SignupForm.tsx to include role selection
+- Create InstructorSignupForm.tsx with comprehensive onboarding
+- Add instructor verification badge system
+- Update header navigation for instructor-specific menus
+
+---
+
+## 🏗️ SYSTEM ARCHITECTURE REQUIREMENTS:
+
+### **BACKEND (Node.js + Express + TypeScript)**
+```typescript
+// Required New Endpoints:
+POST /api/auth/instructor/signup
+POST /api/auth/instructor/verify
+GET /api/instructor/profile
+PUT /api/instructor/profile
+POST /api/instructor/courses/create
+GET /api/admin/instructors/pending
+PUT /api/admin/instructors/approve/:id
+```
+
+### **DATABASE SCHEMA (Drizzle ORM)**
+```sql
+-- Add to existing users table:
+ALTER TABLE users ADD COLUMN instructor_status ENUM('pending', 'approved', 'rejected');
+ALTER TABLE users ADD COLUMN expertise_areas JSON;
+ALTER TABLE users ADD COLUMN bio TEXT;
+ALTER TABLE users ADD COLUMN credentials_url VARCHAR(255);
+ALTER TABLE users ADD COLUMN teaching_experience INTEGER;
+```
+
+### **FRONTEND (React + TypeScript + Tailwind)**
+- Role-based routing with proper guards
+- Instructor onboarding wizard (3-step process)
+- Course creation interface with rich text editor
+- Student enrollment management dashboard
+- Revenue analytics for instructors
+
+---
+
+## 🤖 AI-POWERED FEATURES TO MAINTAIN:
+
+1. **AI Lesson Content Generator** (Using DeepSeek API)
+2. **Smart Quiz Question Creation**
+3. **Student Progress Analytics**
+4. **Automated Course Recommendations**
+5. **AI Study Buddy Chatbot**
+6. **Skill Gap Analysis System**
+
+---
+
+## 🎮 GAMIFICATION SYSTEM REQUIREMENTS:
+
+- XP points for course completion, quiz scores, streak maintenance
+- Badge system with 20+ achievement types
+- Leaderboards (daily, weekly, monthly)
+- Learning streaks with rewards
+- Course completion certificates
+- Peer help reputation system
+
+---
+
+## 💳 MONETIZATION FEATURES:
+
+- Stripe payment integration for course purchases
+- Subscription plans (Basic, Pro, Enterprise)
+- Instructor revenue sharing (70/30 split)
+- Course bundles and discount coupons
+- Affiliate program system
+- Refund management
+
+---
+
+## 📱 MOBILE-FIRST RESPONSIVE DESIGN:
+
+- Progressive Web App (PWA) capabilities
+- Offline video download functionality
+- Touch-optimized video player with HLS streaming
+- Mobile push notifications
+- Responsive design for all screen sizes
+
+---
+
+## 🔐 SECURITY & PERFORMANCE:
+
+- JWT authentication with refresh tokens
+- Rate limiting on all endpoints
+- Input validation and sanitization
+- CORS configuration
+- Database query optimization
+- Video compression and CDN delivery
+- Redis caching for frequently accessed data
+
+---
+
+## 🚀 DEPLOYMENT READY FEATURES:
+
+- Environment configuration (.env file support)
+- Production logging with Winston
+- Error monitoring and recovery
+- Database migrations system
+- Automated testing suite ready
+- Docker containerization support
+- CI/CD pipeline configuration
+
+---
+
+## 💾 CURRENT TECH STACK:
+
+**Backend:**
+- Node.js + Express + TypeScript
+- Drizzle ORM + PostgreSQL
+- DeepSeek AI API integration
+- Stripe payment processing
+- Backblaze B2 file storage
+- FFmpeg video processing
+- Winston logging
+
+**Frontend:**
+- React 18 + TypeScript
+- Tailwind CSS + shadcn/ui
+- React Router for navigation
+- Context API for state management
+- React Query for data fetching
+- Video.js for video playback
+
+**AI Integration:**
+- DeepSeek API for content generation
+- Custom AI service wrapper
+- Intelligent content analysis
+- Automated quiz generation
+- Personalized learning paths
+
+---
+
+## 🎯 SUCCESS CRITERIA:
+
+1. ✅ **Complete instructor signup and verification system**
+2. ✅ **Role-based authentication working perfectly**
+3. ✅ **Instructor dashboard with course creation**
+4. ✅ **Admin panel for instructor approval**
+5. ✅ **All existing AI features remain functional**
+6. ✅ **Mobile-responsive across all devices**
+7. ✅ **Production-ready with proper error handling**
+8. ✅ **Database properly configured with migrations**
+
+---
+
+## 🔥 SPECIAL INSTRUCTIONS:
+
+**CRITICAL:** This is a production system that needs to handle 10,000+ concurrent users. Every feature must be:
+- **Scalable** - Built to handle massive traffic
+- **Secure** - Enterprise-grade security practices
+- **Fast** - Optimized for performance
+- **Reliable** - Robust error handling and recovery
+- **Maintainable** - Clean, documented code
+
+**PRIORITY ORDER:**
+1. Fix instructor registration system (URGENT)
+2. Ensure all AI features work properly
+3. Verify payment processing is secure
+4. Test mobile responsiveness
+5. Confirm production deployment readiness
+
+---
+
+## 💡 IMPLEMENTATION STRATEGY:
+
+**Phase 1: Authentication Fix (2 hours)**
+- Implement role-based signup
+- Create instructor onboarding flow
+- Add admin approval system
+
+**Phase 2: Dashboard Creation (3 hours)**
+- Build instructor dashboard
+- Add course creation interface
+- Implement student management
+
+**Phase 3: Testing & Optimization (1 hour)**
+- Test all user flows
+- Verify AI integrations
+- Performance optimization
+
+---
+
+**🎯 FINAL GOAL:** Create the most advanced, AI-powered LMS platform that rivals Udemy, Coursera, and edX combined, with unique features that set it apart in the market.
+
+**🚀 MAKE IT LEGENDARY!**
+
+This system should be so impressive that it becomes the gold standard for modern educational platforms. Every component should be production-ready, scalable, and built with enterprise-grade quality.
+
+**NOW GO BUILD THE FUTURE OF EDUCATION! 🎓**

@@ -73,6 +73,24 @@ router.get('/auth/dashboard',
   asyncHandler(AuthController.getDashboard)
 );
 
+// ===== INSTRUCTOR AUTHENTICATION ROUTES =====
+router.post('/auth/instructor/signup',
+  authLimiter.middleware,
+  asyncHandler(AuthController.instructorSignup)
+);
+
+router.put('/auth/instructor/profile',
+  authenticate,
+  authorize(['instructor']),
+  asyncHandler(AuthController.updateInstructorProfile)
+);
+
+router.get('/auth/instructor/profile',
+  authenticate,
+  authorize(['instructor']),
+  asyncHandler(AuthController.getInstructorProfile)
+);
+
 // ===== COURSE ROUTES =====
 router.get('/courses',
   validateRequest({ query: paginationSchema }),
