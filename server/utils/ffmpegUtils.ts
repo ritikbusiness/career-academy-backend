@@ -7,9 +7,11 @@ export function convertToHLS(inputPath: string, outputDir: string): Promise<void
 
     const args = [
       '-i', inputPath,
-      '-profile:v', 'baseline',
-      '-level', '3.0',
-      '-start_number', '0',
+      '-c:v', 'libx264',
+      '-profile:v', 'main',
+      '-level', '3.1',
+      '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac',
       '-hls_time', '10',
       '-hls_list_size', '0',
       '-f', 'hls',
