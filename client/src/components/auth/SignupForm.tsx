@@ -15,7 +15,7 @@ const SignupForm = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'student' as 'student' | 'instructor' | 'admin',
+    role: 'student' as const,
   });
   const { loginWithGoogle, isLoading } = useAuth();
   const { toast } = useToast();
@@ -59,13 +59,8 @@ const SignupForm = () => {
         description: `Welcome to Desired Career Academy as ${formData.role}!`,
       });
       
-      // For instructor role, redirect to detailed instructor signup
-      if (formData.role === 'instructor') {
-        navigate('/instructor-signup');
-      } else {
-        // For students, proceed with regular onboarding
-        navigate('/onboarding');
-      }
+      // All regular signups are students - proceed with onboarding
+      navigate('/onboarding');
     } catch (error) {
       toast({
         title: "Signup failed",
@@ -146,18 +141,8 @@ const SignupForm = () => {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="role">I want to join as</Label>
-              <Select value={formData.role} onValueChange={(value) => setFormData(prev => ({ ...prev, role: value as 'student' | 'instructor' | 'admin' }))}>
-                <SelectTrigger data-testid="select-role">
-                  <SelectValue placeholder="Select your role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="student">Student - Learn new skills</SelectItem>
-                  <SelectItem value="instructor">Instructor - Teach and share knowledge</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Role is fixed as student for regular signup */}
+            <input type="hidden" name="role" value="student" />
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input

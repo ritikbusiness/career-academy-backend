@@ -4,7 +4,7 @@ import { hashPassword, comparePassword } from '../utils/helpers';
 import { generateToken, AuthRequest } from '../middleware/auth';
 import { securityLogger, logger } from '../utils/logger';
 import { createValidationError, createAuthError, createConflictError, AppError } from '../middleware/errorHandler';
-import { insertUserSchema, instructorSignupSchema, instructorProfileUpdateSchema } from '@shared/schema';
+import { insertUserSchema, instructorSignupSchema, instructorProfileUpdateSchema, validateInstructorInviteSchema } from '@shared/schema';
 
 export class AuthController {
   // User registration
@@ -336,11 +336,75 @@ export class AuthController {
     }
   }
 
-  // Instructor registration with verification
-  static async instructorSignup(req: Request, res: Response) {
+  // Validate instructor invite token
+  static async validateInstructorInvite(req: Request, res: Response) {
+    try {
+      const { token } = validateInstructorInviteSchema.parse(req.query);
+      
+      // Get invite by token
+      const invite = await storage.getInstructorInviteByToken?.(token);
+      if (!invite) {
+        throw createValidationError('Invalid or expired invite token');
+      }
+
+      // Check if token is expired
+      if (new Date() > invite.expiresAt) {
+        throw createValidationError('Invite token has expired');
+      }
+
+      // Check if token is already used
+      if (invite.isUsed) {
+        throw createValidationError('Invite token has already been used');
+      }
+
+      res.json({
+        success: true,
+        message: 'Invite token is valid',
+        data: {
+          email: invite.email,
+          token: invite.token
+        }
+      });
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      logger.error('Validate instructor invite error:', error);
+      throw createValidationError('Failed to validate invite token');
+    }
+  }
+
+  // Instructor registration with verified invite token
+  static async instructorSignupWithToken(req: Request, res: Response) {
     try {
       const instructorData = instructorSignupSchema.parse(req.body);
+      const { token } = req.body;
       
+      if (!token) {
+        throw createValidationError('Invite token is required');
+      }
+
+      // Validate invite token
+      const invite = await storage.getInstructorInviteByToken?.(token);
+      if (!invite) {
+        throw createValidationError('Invalid invite token');
+      }
+
+      // Check if token is expired
+      if (new Date() > invite.expiresAt) {
+        throw createValidationError('Invite token has expired');
+      }
+
+      // Check if token is already used
+      if (invite.isUsed) {
+        throw createValidationError('Invite token has already been used');
+      }
+
+      // Verify email matches the invited email
+      if (instructorData.email !== invite.email) {
+        throw createValidationError('Email must match the invited email address');
+      }
+
       // Check if user already exists
       const existingUser = await storage.getUserByUsername(instructorData.username);
       if (existingUser) {
@@ -355,13 +419,17 @@ export class AuthController {
       // Hash password
       const hashedPassword = await hashPassword(instructorData.password);
       
-      // Create instructor with pending status
+      // Create instructor with approved status (since they have a valid invite)
       const newInstructor = await storage.createUser({
         ...instructorData,
         password: hashedPassword,
         role: 'instructor',
-        instructorStatus: 'pending'
+        instructorStatus: 'approved',
+        verificationDate: new Date()
       });
+
+      // Mark invite as used
+      await storage.markInstructorInviteAsUsed?.(invite.id, newInstructor.id);
 
       // Initialize user stats
       await storage.createUserStats?.({
@@ -378,13 +446,13 @@ export class AuthController {
       });
 
       // Generate JWT token
-      const token = generateToken(newInstructor.id);
+      const authToken = generateToken(newInstructor.id);
 
       securityLogger.authSuccess(newInstructor.id, newInstructor.username, req.ip || 'unknown');
       
       res.status(201).json({
         success: true,
-        message: 'Instructor registration submitted for review',
+        message: 'Instructor registration completed successfully',
         data: {
           user: {
             id: newInstructor.id,
@@ -395,7 +463,7 @@ export class AuthController {
             instructorStatus: newInstructor.instructorStatus,
             avatar: newInstructor.avatar
           },
-          token
+          token: authToken
         }
       });
     } catch (error) {

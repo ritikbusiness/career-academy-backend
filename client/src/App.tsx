@@ -16,7 +16,7 @@ import NotFound from './pages/NotFound';
 import Unauthorized from './pages/Unauthorized';
 import LoginForm from './components/auth/LoginForm';
 import SignupForm from './components/auth/SignupForm';
-import InstructorSignupForm from './components/auth/InstructorSignupForm';
+import InstructorSignupWithToken from './components/auth/InstructorSignupWithToken';
 import OnboardingForm from './components/auth/OnboardingForm';
 
 // Create a client
@@ -39,7 +39,7 @@ function App() {
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<LoginForm />} />
               <Route path="/signup" element={<SignupForm />} />
-              <Route path="/instructor-signup" element={<InstructorSignupForm />} />
+              <Route path="/instructor-signup" element={<InstructorSignupWithToken />} />
               <Route path="/onboarding" element={<OnboardingForm />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/courses" element={<StudentCourses />} />
