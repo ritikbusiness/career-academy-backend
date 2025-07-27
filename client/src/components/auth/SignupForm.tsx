@@ -14,6 +14,7 @@ const SignupForm = () => {
     email: '',
     password: '',
     confirmPassword: '',
+    role: 'student' as 'student' | 'instructor' | 'admin',
   });
   const { loginWithGoogle, isLoading } = useAuth();
   const { toast } = useToast();
@@ -32,12 +33,39 @@ const SignupForm = () => {
     }
 
     try {
-      // Mock signup - replace with actual API
+      // API call to register user with role
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: formData.email.split('@')[0], // Use email prefix as username
+          email: formData.email,
+          password: formData.password,
+          fullName: formData.fullName,
+          role: formData.role,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Registration failed');
+      }
+
       toast({
         title: "Account created successfully",
-        description: "Please complete your profile setup.",
+        description: `Welcome to Desired Career Academy as ${formData.role}!`,
       });
-      navigate('/onboarding');
+      
+      // Navigate based on role
+      if (formData.role === 'instructor') {
+        navigate('/instructor');
+      } else if (formData.role === 'admin') {
+        navigate('/dashboard');
+      } else {
+        navigate('/onboarding');
+      }
     } catch (error) {
       toast({
         title: "Signup failed",
@@ -60,7 +88,7 @@ const SignupForm = () => {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData(prev => ({
       ...prev,
       [e.target.name]: e.target.value,
@@ -141,6 +169,21 @@ const SignupForm = () => {
                 onChange={handleInputChange}
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="role">I want to join as:</Label>
+              <select
+                id="role"
+                name="role"
+                value={formData.role}
+                onChange={handleInputChange}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                required
+              >
+                <option value="student">Student - Learn new skills</option>
+                <option value="instructor">Instructor - Teach courses</option>
+                <option value="admin">Admin - Manage platform</option>
+              </select>
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Creating account..." : "Create Account"}
