@@ -38,10 +38,23 @@ router.post('/auth/register',
   asyncHandler(AuthController.register)
 );
 
+// Add signup route (alias for register to match user expectations)
+router.post('/auth/signup', 
+  authLimiter.middleware,
+  validateRequest({ body: registerSchema }),
+  asyncHandler(AuthController.register)
+);
+
 router.post('/auth/login',
   authLimiter.middleware,
   validateRequest({ body: loginSchema }),
   asyncHandler(AuthController.login)
+);
+
+// Add me route (alias for profile to match user expectations)
+router.get('/auth/me',
+  authenticate,
+  asyncHandler(AuthController.getProfile)
 );
 
 router.post('/auth/refresh',
