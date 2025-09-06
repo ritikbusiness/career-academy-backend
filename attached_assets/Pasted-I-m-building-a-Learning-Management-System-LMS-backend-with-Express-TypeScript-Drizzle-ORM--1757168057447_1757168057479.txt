@@ -1,0 +1,113 @@
+I’m building a Learning Management System (LMS) backend with **Express + TypeScript + Drizzle ORM + PostgreSQL**.
+
+⚠️ Current Problem:
+- When I test with:
+  ```bash
+  curl -X POST http://localhost:5000/api/auth/signup
+  ```
+  I get:  
+  `❌ Error: Route /api/auth/signup not found`  
+
+This means **auth routes are missing or not properly mounted**.  
+Also, I need to be 100% sure that **user signup/login works with PostgreSQL + JWT**.
+
+---
+
+🎯 Your Mission:
+Fix and implement a **complete authentication system** that is fully production-ready.
+
+---
+
+## ✅ Tasks
+
+### 1. Routes Setup
+- Create `/api/auth` routes with the following endpoints:
+  - `POST /signup` → Register a new user  
+  - `POST /login` → Login and return JWT  
+  - `GET /me` → Return logged-in user (only if JWT valid)  
+
+Make sure routes are **mounted correctly** in `server/index.ts` (or `app.ts`):
+
+```ts
+import authRoutes from "./routes/auth.routes";
+app.use("/api/auth", authRoutes);
+```
+
+---
+
+### 2. Controllers (auth.controller.ts)
+- **Signup:**
+  - Validate input with Zod  
+  - Check if email already exists  
+  - Hash password with bcrypt  
+  - Insert into `users` table via Drizzle  
+  - Return success JSON  
+
+- **Login:**
+  - Verify email + password hash  
+  - If valid, issue a **JWT** with user ID + role  
+  - Return token + user data  
+
+- **Me:**
+  - Read JWT from Authorization header  
+  - If valid, return current user details  
+
+---
+
+### 3. Database Integration
+- Ensure PostgreSQL `.env` is set:
+  ```
+  DATABASE_URL=postgresql://lms_user:password@localhost:5432/lms
+  ```
+- If Drizzle migrations or schema mismatch exists → **fix automatically** so signup/login works.  
+
+- Table: `users`
+  ```ts
+  id (uuid, primary key)
+  name (string)
+  email (unique, string)
+  password (hashed string)
+  role (enum: "student" | "instructor" | "admin", default: "student")
+  createdAt (timestamp)
+  ```
+
+---
+
+### 4. Middleware
+- Add JWT middleware:
+  - Verify token  
+  - Attach `req.user` with { id, role }  
+  - Protect `/me` and future protected routes  
+
+---
+
+### 5. Error Handling
+- If signup/login fails → return proper 400/401 JSON error.  
+- If DB connection fails → log clear error + guide to fix `.env`.  
+- Don’t crash server on error → always handle gracefully.  
+
+---
+
+## 🧪 Expected Outcome
+
+After your fixes:
+
+1. Run `npm run dev`
+2. ✅ `POST /api/auth/signup` → creates new user in DB  
+3. ✅ `POST /api/auth/login` → returns valid JWT  
+4. ✅ `GET /api/auth/me` → returns current user if JWT valid  
+
+This must be **clean TypeScript code**, following best practices, fully functional with Drizzle + PostgreSQL.
+
+---
+
+🔐 Extra:
+- Passwords always hashed (bcrypt).  
+- JWT secret should come from `.env`.  
+- Code must be modular (routes, controllers, utils).  
+
+---
+
+🎯 Goal:  
+A **fully working, production-grade authentication system** with Express + TypeScript + Drizzle + PostgreSQL.  
+
