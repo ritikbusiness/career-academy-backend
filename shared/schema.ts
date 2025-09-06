@@ -335,8 +335,6 @@ export const validateInstructorInviteSchema = z.object({
 });
 
 // Type exports
-export type User = typeof users.$inferSelect;
-export type InsertUser = typeof users.$inferInsert;
 export type InstructorInvite = typeof instructorInvites.$inferSelect;
 export type InsertInstructorInvite = typeof instructorInvites.$inferInsert;
 
