@@ -13,6 +13,7 @@ import { validateRequest, registerSchema, loginSchema, createCourseSchema, creat
 import { generalLimiter, authLimiter, aiLimiter } from './middleware/rateLimiter';
 import { asyncHandler } from './middleware/errorHandler';
 import { AIService } from './services/aiService';
+import passport from './config/passport';
 
 const router = express.Router();
 
@@ -85,6 +86,16 @@ router.put('/auth/change-password',
 router.get('/auth/dashboard',
   authenticate,
   asyncHandler(AuthController.getDashboard)
+);
+
+// Google OAuth routes
+router.get('/auth/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] })
+);
+
+router.get('/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: '/login?error=google_auth_failed' }),
+  asyncHandler(AuthController.googleCallback)
 );
 
 // ===== INSTRUCTOR AUTHENTICATION ROUTES =====

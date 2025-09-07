@@ -5,8 +5,38 @@ import { generateToken, AuthRequest } from '../middleware/auth';
 import { securityLogger, logger } from '../utils/logger';
 import { createValidationError, createAuthError, createConflictError, AppError } from '../middleware/errorHandler';
 import { insertUserSchema, instructorSignupSchema, instructorProfileUpdateSchema, validateInstructorInviteSchema } from '@shared/schema';
+import passport from '../config/passport';
 
 export class AuthController {
+  // Google OAuth success handler
+  static async googleCallback(req: Request, res: Response) {
+    try {
+      const user = req.user as any;
+      if (!user) {
+        throw createAuthError('Google authentication failed');
+      }
+
+      // Generate JWT token
+      const token = generateToken(user.id);
+
+      // Redirect to frontend with token
+      const frontendUrl = process.env.NODE_ENV === 'production' 
+        ? 'https://your-domain.com' 
+        : 'http://localhost:5000';
+        
+      res.redirect(`${frontendUrl}/auth/google/success?token=${token}&user=${encodeURIComponent(JSON.stringify({
+        id: user.id,
+        username: user.username,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar
+      }))}`);
+    } catch (error) {
+      logger.error('Google OAuth callback error:', error);
+      res.redirect('/auth/google/error');
+    }
+  }
   // User registration
   static async register(req: Request, res: Response) {
     try {

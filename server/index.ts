@@ -12,6 +12,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { errorHandler, notFound } from "./middleware/errorHandler";
 import { apiLogger } from "./utils/logger";
 import cors from "cors";
+import passport from './config/passport';
 
 const app = express();
 
@@ -19,6 +20,9 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+
+// Initialize Passport
+app.use(passport.initialize());
 
 app.use((req, res, next) => {
   const start = Date.now();
