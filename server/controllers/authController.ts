@@ -16,25 +16,29 @@ export class AuthController {
         throw createAuthError('Google authentication failed');
       }
 
+      // Log successful authentication with real email
+      securityLogger.authSuccess(user.id, user.email, req.ip || 'unknown');
+
       // Generate JWT token
       const token = generateToken(user.id);
 
-      // Redirect to frontend with token
+      // Redirect to frontend with token and real user data
       const frontendUrl = process.env.NODE_ENV === 'production' 
-        ? 'https://your-domain.com' 
+        ? process.env.FRONTEND_URL || 'https://your-domain.com' 
         : 'http://localhost:5000';
         
       res.redirect(`${frontendUrl}/auth/google/success?token=${token}&user=${encodeURIComponent(JSON.stringify({
         id: user.id,
         username: user.username,
         fullName: user.fullName,
-        email: user.email,
+        email: user.email, // Real Gmail address
         role: user.role,
-        avatar: user.avatar
+        avatar: user.avatar,
+        instructorStatus: user.instructorStatus
       }))}`);
     } catch (error) {
       logger.error('Google OAuth callback error:', error);
-      res.redirect('/auth/google/error');
+      res.redirect('/login?error=google_auth_failed');
     }
   }
   // User registration

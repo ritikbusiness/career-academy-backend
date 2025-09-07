@@ -1,6 +1,7 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { storage } from '../storage';
+import { logger } from '../utils/logger';
 
 // Extend Express Request to include our User type for Passport
 declare global {
@@ -22,25 +23,38 @@ declare global {
 passport.use(new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID!,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-  callbackURL: "/api/auth/google/callback"
+  callbackURL: process.env.GOOGLE_CALLBACK_URL || "/api/auth/google/callback",
+  scope: ['profile', 'email']
 }, async (accessToken, refreshToken, profile, done) => {
   try {
-    // Check if user already exists with this Google ID
-    let user = await storage.getUserByEmail(profile.emails?.[0]?.value || '');
+    // Validate that we have required Google profile data
+    if (!profile.emails || !profile.emails[0] || !profile.emails[0].value) {
+      return done(new Error('No email provided by Google'), false);
+    }
+
+    const googleEmail = profile.emails[0].value;
+    const googleName = profile.displayName || profile.name?.givenName + ' ' + profile.name?.familyName || 'Google User';
+    const googleAvatar = profile.photos?.[0]?.value;
+
+    // Check if user already exists with this Google email
+    let user = await storage.getUserByEmail(googleEmail);
     
     if (user) {
-      // User exists, return the user
+      // User exists, log them in
+      logger.info(`Existing user logged in via Google: ${googleEmail}`);
       return done(null, user);
     } else {
-      // Create new user
+      // Create new user with real Google data
       const newUser = await storage.createUser({
-        username: profile.emails?.[0]?.value || `google_${profile.id}`,
-        email: profile.emails?.[0]?.value || '',
-        fullName: profile.displayName || 'Google User',
-        password: '', // No password for OAuth users
+        username: googleEmail, // Use email as username for Google users
+        email: googleEmail,    // Use actual Google email
+        fullName: googleName,  // Use actual Google display name
+        password: '',          // No password for OAuth users
         role: 'student',
-        avatar: profile.photos?.[0]?.value || undefined
+        avatar: googleAvatar
       });
+
+      logger.info(`New user created via Google OAuth: ${googleEmail}`);
 
       // Initialize user stats for gamification
       await storage.createUserStats?.({
@@ -59,6 +73,7 @@ passport.use(new GoogleStrategy({
       return done(null, newUser);
     }
   } catch (error) {
+    logger.error('Google OAuth error:', error);
     return done(error, false);
   }
 }));

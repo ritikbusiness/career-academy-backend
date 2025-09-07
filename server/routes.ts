@@ -90,7 +90,10 @@ router.get('/auth/dashboard',
 
 // Google OAuth routes
 router.get('/auth/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
+  passport.authenticate('google', { 
+    scope: ['profile', 'email'],
+    prompt: 'select_account' // Force Google account chooser
+  })
 );
 
 router.get('/auth/google/callback',
