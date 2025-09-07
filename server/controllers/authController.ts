@@ -9,7 +9,7 @@ import passport from '../config/passport';
 
 export class AuthController {
   // Google OAuth success handler
-  static async googleCallback(req: Request, res: Response) {
+  static async googleCallback(req: AuthRequest, res: Response) {
     try {
       const user = req.user as any;
       if (!user) {
@@ -517,7 +517,7 @@ export class AuthController {
       }
 
       // Update instructor profile
-      const updatedInstructor = await storage.updateUser(userId, updateData);
+      const updatedInstructor = await storage.updateUserProfile({ ...updateData, id: userId });
 
       res.json({
         success: true,

@@ -2,6 +2,22 @@ import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { storage } from '../storage';
 
+// Extend Express Request to include our User type for Passport
+declare global {
+  namespace Express {
+    interface User {
+      id: number;
+      username: string;
+      fullName: string;
+      email: string;
+      role: string;
+      avatar?: string | null;
+      instructorStatus?: string | null;
+      [key: string]: any; // Allow additional properties from database
+    }
+  }
+}
+
 // Google OAuth Strategy
 passport.use(new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID!,
@@ -43,7 +59,7 @@ passport.use(new GoogleStrategy({
       return done(null, newUser);
     }
   } catch (error) {
-    return done(error, null);
+    return done(error, false);
   }
 }));
 
@@ -54,7 +70,11 @@ passport.serializeUser((user: any, done) => {
 passport.deserializeUser(async (id: number, done) => {
   try {
     const user = await storage.getUser(id);
-    done(null, user || false);
+    if (user) {
+      done(null, user);
+    } else {
+      done(null, false);
+    }
   } catch (error) {
     done(error, false);
   }

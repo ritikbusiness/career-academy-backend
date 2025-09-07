@@ -11,7 +11,7 @@ import { handleSecureVideoUpload, verifyVideoAccess, updateLessonVideo, regenera
 import { authenticate, authorize, authorizeApprovedInstructor, authorizeAdmin, refreshToken } from './middleware/auth';
 import { validateRequest, registerSchema, loginSchema, createCourseSchema, createQuestionSchema, createAnswerSchema, idParamSchema, paginationSchema } from './middleware/validator';
 import { generalLimiter, authLimiter, aiLimiter } from './middleware/rateLimiter';
-import { asyncHandler } from './middleware/errorHandler';
+import { asyncHandler, authAsyncHandler } from './middleware/errorHandler';
 import { AIService } from './services/aiService';
 import passport from './config/passport';
 
@@ -55,37 +55,37 @@ router.post('/auth/login',
 // Add me route (alias for profile to match user expectations)
 router.get('/auth/me',
   authenticate,
-  asyncHandler(AuthController.getProfile)
+  authAsyncHandler(AuthController.getProfile)
 );
 
 router.post('/auth/refresh',
   authenticate,
-  asyncHandler(refreshToken)
+  authAsyncHandler(refreshToken)
 );
 
 router.post('/auth/logout',
   authenticate,
-  asyncHandler(AuthController.logout)
+  authAsyncHandler(AuthController.logout)
 );
 
 router.get('/auth/profile',
   authenticate,
-  asyncHandler(AuthController.getProfile)
+  authAsyncHandler(AuthController.getProfile)
 );
 
 router.put('/auth/profile',
   authenticate,
-  asyncHandler(AuthController.updateProfile)
+  authAsyncHandler(AuthController.updateProfile)
 );
 
 router.put('/auth/change-password',
   authenticate,
-  asyncHandler(AuthController.changePassword)
+  authAsyncHandler(AuthController.changePassword)
 );
 
 router.get('/auth/dashboard',
   authenticate,
-  asyncHandler(AuthController.getDashboard)
+  authAsyncHandler(AuthController.getDashboard)
 );
 
 // Google OAuth routes
@@ -95,7 +95,7 @@ router.get('/auth/google',
 
 router.get('/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/login?error=google_auth_failed' }),
-  asyncHandler(AuthController.googleCallback)
+  authAsyncHandler(AuthController.googleCallback)
 );
 
 // ===== INSTRUCTOR AUTHENTICATION ROUTES =====
@@ -111,32 +111,32 @@ router.post('/auth/instructor/signup',
 router.put('/auth/instructor/profile',
   authenticate,
   authorizeApprovedInstructor,
-  asyncHandler(AuthController.updateInstructorProfile)
+  authAsyncHandler(AuthController.updateInstructorProfile)
 );
 
 router.get('/auth/instructor/profile',
   authenticate,
   authorizeApprovedInstructor,
-  asyncHandler(AuthController.getInstructorProfile)
+  authAsyncHandler(AuthController.getInstructorProfile)
 );
 
 // ===== INSTRUCTOR INVITE ROUTES (Admin Only) =====
 router.post('/admin/instructor-invites',
   authenticate,
   authorize(['admin']),
-  asyncHandler(InstructorInviteController.generateInvite)
+  authAsyncHandler(InstructorInviteController.generateInvite)
 );
 
 router.get('/admin/instructor-invites',
   authenticate,
   authorize(['admin']),
-  asyncHandler(InstructorInviteController.listInvites)
+  authAsyncHandler(InstructorInviteController.listInvites)
 );
 
 router.delete('/admin/instructor-invites/:inviteId',
   authenticate,
   authorize(['admin']),
-  asyncHandler(InstructorInviteController.revokeInvite)
+  authAsyncHandler(InstructorInviteController.revokeInvite)
 );
 
 router.get('/instructor-invites/:token',
@@ -147,37 +147,37 @@ router.get('/instructor-invites/:token',
 router.get('/admin/instructors/pending',
   authenticate,
   authorizeAdmin,
-  asyncHandler(AdminController.getPendingInstructors)
+  authAsyncHandler(AdminController.getPendingInstructors)
 );
 
 router.get('/admin/instructors',
   authenticate,
   authorizeAdmin,
-  asyncHandler(AdminController.getAllInstructors)
+  authAsyncHandler(AdminController.getAllInstructors)
 );
 
 router.post('/admin/instructors/:instructorId/approve',
   authenticate,
   authorizeAdmin,
-  asyncHandler(AdminController.approveInstructor)
+  authAsyncHandler(AdminController.approveInstructor)
 );
 
 router.post('/admin/instructors/:instructorId/reject',
   authenticate,
   authorizeAdmin,
-  asyncHandler(AdminController.rejectInstructor)
+  authAsyncHandler(AdminController.rejectInstructor)
 );
 
 router.post('/admin/instructors/:instructorId/reset',
   authenticate,
   authorizeAdmin,
-  asyncHandler(AdminController.resetInstructorStatus)
+  authAsyncHandler(AdminController.resetInstructorStatus)
 );
 
 router.get('/admin/stats',
   authenticate,
   authorizeAdmin,
-  asyncHandler(AdminController.getPlatformStats)
+  authAsyncHandler(AdminController.getPlatformStats)
 );
 
 // ===== COURSE ROUTES =====
@@ -222,19 +222,19 @@ router.post('/courses/:id/enroll',
 router.get('/my-courses',
   authenticate,
   authorize(['student']),
-  asyncHandler(CourseController.getUserCourses)
+  authAsyncHandler(CourseController.getUserCourses)
 );
 
 router.get('/instructor-courses',
   authenticate,
   authorize(['instructor', 'admin']),
-  asyncHandler(CourseController.getInstructorCourses)
+  authAsyncHandler(CourseController.getInstructorCourses)
 );
 
 router.post('/courses/:courseId/modules',
   authenticate,
   authorize(['instructor', 'admin']),
-  asyncHandler(CourseController.addModule)
+  authAsyncHandler(CourseController.addModule)
 );
 
 router.post('/modules/:moduleId/lessons',

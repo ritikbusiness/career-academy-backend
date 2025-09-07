@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger';
+import { AuthRequest } from './auth';
 
 export interface ApiError extends Error {
   statusCode?: number;
@@ -21,7 +22,14 @@ export class AppError extends Error implements ApiError {
 
 // Async error handler wrapper
 export const asyncHandler = (fn: Function) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: any, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+};
+
+// Auth-aware async error handler wrapper
+export const authAsyncHandler = (fn: (req: AuthRequest, res: Response, next?: NextFunction) => Promise<any>) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 };
