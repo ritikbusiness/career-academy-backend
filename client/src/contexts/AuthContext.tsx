@@ -85,25 +85,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithGoogle = async () => {
     setAuthState(prev => ({ ...prev, isLoading: true }));
     
-    // Mock Google OAuth - replace with actual Google OAuth
     try {
-      const mockUser: User = {
-        id: '1',
-        fullName: 'John Doe',
-        email: 'john@example.com',
-        role: 'student',
-        domain: 'Engineering',
-        branch: 'Computer Science',
-        year: '2024',
-        createdAt: new Date().toISOString(),
-      };
-      
-      localStorage.setItem('lms_user', JSON.stringify(mockUser));
-      setAuthState({
-        user: mockUser,
-        isAuthenticated: true,
-        isLoading: false,
-      });
+      // Redirect to Google OAuth endpoint
+      const googleAuthUrl = '/api/auth/google';
+      window.location.href = googleAuthUrl;
     } catch (error) {
       setAuthState(prev => ({ ...prev, isLoading: false }));
       throw error;

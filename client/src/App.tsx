@@ -19,6 +19,7 @@ import LoginForm from './components/auth/LoginForm';
 import SignupForm from './components/auth/SignupForm';
 import InstructorSignupWithToken from './components/auth/InstructorSignupWithToken';
 import OnboardingForm from './components/auth/OnboardingForm';
+import GoogleAuthSuccess from './pages/auth/GoogleAuthSuccess';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -41,6 +42,7 @@ function App() {
               <Route path="/login" element={<LoginForm />} />
               <Route path="/signup" element={<SignupForm />} />
               <Route path="/instructor-signup" element={<InstructorSignupWithToken />} />
+              <Route path="/auth/google/success" element={<GoogleAuthSuccess />} />
               <Route path="/onboarding" element={<OnboardingForm />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/courses" element={<StudentCourses />} />
