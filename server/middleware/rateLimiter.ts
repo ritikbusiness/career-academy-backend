@@ -28,11 +28,15 @@ class RateLimiter {
 
   private cleanup() {
     const now = Date.now();
-    for (const [key, client] of this.clients.entries()) {
+    const keysToDelete: string[] = [];
+    
+    this.clients.forEach((client, key) => {
       if (now > client.resetTime) {
-        this.clients.delete(key);
+        keysToDelete.push(key);
       }
-    }
+    });
+    
+    keysToDelete.forEach(key => this.clients.delete(key));
   }
 
   middleware = (req: Request, res: Response, next: NextFunction) => {
