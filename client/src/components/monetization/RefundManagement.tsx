@@ -52,7 +52,7 @@ export default function RefundManagement({ userRole, userId, enrolledCourses = [
       courseName: 'React Advanced Patterns',
       studentId: 'student1',
       studentName: 'John Doe',
-      studentEmail: 'john@example.com',
+      studentEmail: 'student1@example.com',
       amount: 99,
       reason: 'course_quality',
       description: 'The course content did not match the description provided.',

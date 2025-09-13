@@ -240,7 +240,7 @@ const InstructorSignupForm = () => {
           type="email"
           value={formData.email}
           onChange={(e) => handleInputChange('email', e.target.value)}
-          placeholder="john@example.com"
+          placeholder="Enter your email address"
           required
         />
       </div>

@@ -64,7 +64,7 @@ export default function AffiliateProgram({ userRole, userId }: AffiliateProgramP
   const [referrals] = useState<Referral[]>([
     {
       id: '1',
-      referredEmail: 'john@example.com',
+      referredEmail: 'referral1@example.com',
       referredName: 'John Doe',
       signupDate: '2025-01-20',
       status: 'purchased',
