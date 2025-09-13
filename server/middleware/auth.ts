@@ -1,143 +1,51 @@
-import jwt from 'jsonwebtoken';
+// AUTHENTICATION SYSTEM REMOVED
+// This middleware has been removed as part of complete auth system rebuild
+// Will be replaced with clean implementation
+
 import { Request, Response, NextFunction } from 'express';
-import { storage } from '../storage';
 
 export interface AuthRequest extends Request {
-  user?: {
-    id: number;
-    username: string;
-    fullName: string;
-    email: string;
-    role: 'student' | 'instructor' | 'admin';
-    instructorStatus?: 'pending' | 'approved' | 'rejected';
-  };
+  user?: any; // Placeholder for rebuild
 }
 
-// JWT Authentication Middleware
-export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
-    const user = await storage.getUser(decoded.userId);
-
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
-
-    req.user = {
-      id: user.id,
-      username: user.username,
-      fullName: user.fullName,
-      email: user.email,
-      role: user.role as 'student' | 'instructor' | 'admin',
-      instructorStatus: user.instructorStatus as 'pending' | 'approved' | 'rejected' | undefined
-    };
-
-    next();
-  } catch (error) {
-    res.status(401).json({ error: 'Invalid token' });
-  }
+// Placeholder middleware during rebuild
+export const authenticate = (req: Request, res: Response, next: NextFunction) => {
+  res.status(503).json({
+    success: false,
+    error: 'Authentication system is being rebuilt. Please check back shortly.'
+  });
 };
 
-// Role-based authorization middleware
 export const authorize = (roles: string[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ error: 'Insufficient permissions' });
-    }
-
-    next();
+  return (req: Request, res: Response, next: NextFunction) => {
+    res.status(503).json({
+      success: false,
+      error: 'Authorization system is being rebuilt. Please check back shortly.'
+    });
   };
 };
 
-// Enhanced authorization for approved instructors only
-export const authorizeApprovedInstructor = (req: AuthRequest, res: Response, next: NextFunction) => {
-  if (!req.user) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  // Admins can access everything
-  if (req.user.role === 'admin') {
-    return next();
-  }
-
-  // Check instructor role and approval status
-  if (req.user.role !== 'instructor') {
-    return res.status(403).json({ error: 'Instructor access required' });
-  }
-
-  if (req.user.instructorStatus !== 'approved') {
-    return res.status(403).json({ 
-      error: 'Instructor approval pending',
-      message: 'Your instructor account is pending approval by an administrator.'
-    });
-  }
-
-  next();
+export const authorizeApprovedInstructor = (req: Request, res: Response, next: NextFunction) => {
+  res.status(503).json({
+    success: false,
+    error: 'Instructor authorization is being rebuilt. Please check back shortly.'
+  });
 };
 
-// Admin-only authorization
-export const authorizeAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
-  if (!req.user) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin access required' });
-  }
-
-  next();
+export const authorizeAdmin = (req: Request, res: Response, next: NextFunction) => {
+  res.status(503).json({
+    success: false,
+    error: 'Admin authorization is being rebuilt. Please check back shortly.'
+  });
 };
 
-// Instructors can only access their own content
-export const authorizeResourceOwner = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  if (!req.user) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  // Admins can access everything
-  if (req.user.role === 'admin') {
-    return next();
-  }
-
-  // Add resource ownership validation logic here
-  // This would check if the user owns the resource they're trying to access
-  next();
+export const refreshToken = (req: Request, res: Response) => {
+  res.status(503).json({
+    success: false,
+    error: 'Token refresh is being rebuilt. Please check back shortly.'
+  });
 };
 
-// Generate JWT token
 export const generateToken = (userId: number) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET!, { expiresIn: '7d' });
-};
-
-// Refresh token middleware
-export const refreshToken = async (req: AuthRequest, res: Response) => {
-  try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
-    const user = await storage.getUser(decoded.userId);
-
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
-
-    const newToken = generateToken(user.id);
-    res.json({ token: newToken });
-  } catch (error) {
-    res.status(401).json({ error: 'Invalid token' });
-  }
+  return 'temp-token-during-rebuild';
 };
