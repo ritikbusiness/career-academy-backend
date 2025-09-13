@@ -10,16 +10,36 @@ import { AuthRequest } from '../middleware/auth';
 export class AuthController {
   // User registration with email/password
   static async register(req: Request, res: Response): Promise<void> {
+    const startTime = Date.now();
+    const requestId = `reg-${Math.random().toString(36).substr(2, 9)}`;
+    
+    logger.info(`[${requestId}] Registration request started`, {
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      body: { ...req.body, password: '[REDACTED]' }
+    });
+
     try {
-      // Validate request body
+      // Step 1: Validate request body
+      logger.info(`[${requestId}] Step 1: Validating request body`);
       const validatedData = registerSchema.parse(req.body);
       const { email, password, name, role, domain, branch, year } = validatedData;
+      logger.info(`[${requestId}] Request body validation successful`, {
+        email,
+        name,
+        role: role || 'student',
+        hasOptionalFields: { domain: !!domain, branch: !!branch, year: !!year }
+      });
 
-      // Normalize email
+      // Step 2: Normalize email
+      logger.info(`[${requestId}] Step 2: Normalizing email`);
       const normalizedEmail = email.toLowerCase().trim();
+      logger.info(`[${requestId}] Email normalized: ${email} -> ${normalizedEmail}`);
 
-      // Validate email format
+      // Step 3: Validate email format
+      logger.info(`[${requestId}] Step 3: Validating email format`);
       if (!validateEmail(normalizedEmail)) {
+        logger.warn(`[${requestId}] Email validation failed for: ${normalizedEmail}`);
         res.status(400).json({
           success: false,
           error: 'Invalid email format',
@@ -27,25 +47,43 @@ export class AuthController {
         });
         return;
       }
+      logger.info(`[${requestId}] Email format validation passed`);
 
-      // Validate password strength
+      // Step 4: Validate password strength
+      logger.info(`[${requestId}] Step 4: Validating password strength`);
       const passwordValidation = validatePassword(password);
       if (!passwordValidation.isValid) {
+        logger.warn(`[${requestId}] Password validation failed`, {
+          errors: passwordValidation.errors
+        });
         res.status(400).json(AUTH_ERRORS.weakPassword(passwordValidation.errors));
         return;
       }
+      logger.info(`[${requestId}] Password validation passed`);
 
-      // Check if user already exists
+      // Step 5: Check if user already exists
+      logger.info(`[${requestId}] Step 5: Checking for existing user`);
       const existingUser = await AuthStorage.getUserByEmail(normalizedEmail);
       if (existingUser) {
+        logger.warn(`[${requestId}] Registration failed - user already exists`, {
+          email: normalizedEmail,
+          existingUserId: existingUser.id
+        });
         res.status(409).json(AUTH_ERRORS.emailExists());
         return;
       }
+      logger.info(`[${requestId}] No existing user found - proceeding with registration`);
 
-      // Hash password
+      // Step 6: Hash password
+      logger.info(`[${requestId}] Step 6: Hashing password`);
+      const hashStartTime = Date.now();
       const passwordHash = await hashPassword(password);
+      const hashDuration = Date.now() - hashStartTime;
+      logger.info(`[${requestId}] Password hashed successfully (${hashDuration}ms)`);
 
-      // Create user
+      // Step 7: Create user in database
+      logger.info(`[${requestId}] Step 7: Creating user in database`);
+      const dbStartTime = Date.now();
       const user = await AuthStorage.createUser({
         email: normalizedEmail,
         passwordHash,
@@ -56,10 +94,16 @@ export class AuthController {
         branch,
         year
       });
+      const dbDuration = Date.now() - dbStartTime;
+      logger.info(`[${requestId}] User created successfully in database (${dbDuration}ms)`, {
+        userId: user.id,
+        email: user.email,
+        role: user.role
+      });
 
-      logger.info('User registered successfully', { userId: user.id, email: user.email });
-
-      // Generate tokens
+      // Step 8: Generate tokens
+      logger.info(`[${requestId}] Step 8: Generating authentication tokens`);
+      const tokenStartTime = Date.now();
       const accessToken = generateAccessToken({
         userId: user.id,
         email: user.email,
@@ -67,8 +111,15 @@ export class AuthController {
       });
 
       const { token: refreshToken, jti } = generateRefreshToken(user.id);
+      const tokenDuration = Date.now() - tokenStartTime;
+      logger.info(`[${requestId}] Tokens generated successfully (${tokenDuration}ms)`, {
+        accessTokenLength: accessToken.length,
+        refreshTokenJti: jti
+      });
 
-      // Store refresh token in database
+      // Step 9: Store refresh token in database
+      logger.info(`[${requestId}] Step 9: Storing refresh token in database`);
+      const refreshStartTime = Date.now();
       await AuthStorage.createRefreshToken({
         userId: user.id,
         jti,
@@ -76,9 +127,28 @@ export class AuthController {
         userAgent: req.get('User-Agent') || null,
         ipAddress: req.ip || null
       });
+      const refreshDuration = Date.now() - refreshStartTime;
+      logger.info(`[${requestId}] Refresh token stored successfully (${refreshDuration}ms)`);
 
-      // Set refresh token as httpOnly cookie
+      // Step 10: Set refresh token cookie
+      logger.info(`[${requestId}] Step 10: Setting refresh token cookie`);
       res.cookie('refreshToken', refreshToken, getCookieOptions());
+      logger.info(`[${requestId}] Refresh token cookie set`);
+
+      // Step 11: Send successful response
+      const totalDuration = Date.now() - startTime;
+      logger.info(`[${requestId}] Registration completed successfully`, {
+        userId: user.id,
+        email: user.email,
+        totalDurationMs: totalDuration,
+        performance: {
+          validation: 'N/A',
+          passwordHashing: `${hashDuration}ms`,
+          databaseInsert: `${dbDuration}ms`,
+          tokenGeneration: `${tokenDuration}ms`,
+          refreshTokenStorage: `${refreshDuration}ms`
+        }
+      });
 
       res.status(201).json({
         success: true,
@@ -89,10 +159,41 @@ export class AuthController {
         }
       });
     } catch (error) {
-      logger.error('Registration error:', error);
+      const totalDuration = Date.now() - startTime;
+      logger.error(`[${requestId}] Registration failed after ${totalDuration}ms`, {
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        } : error,
+        ip: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+      
+      // Handle specific error types
+      if (error instanceof Error) {
+        if (error.message.includes('duplicate key')) {
+          logger.warn(`[${requestId}] Database constraint violation - duplicate user`, { error: error.message });
+          res.status(409).json({
+            success: false,
+            error: 'An account with this email already exists'
+          });
+          return;
+        }
+        
+        if (error.message.includes('validation')) {
+          logger.warn(`[${requestId}] Schema validation error`, { error: error.message });
+          res.status(400).json({
+            success: false,
+            error: 'Invalid registration data provided'
+          });
+          return;
+        }
+      }
+      
       res.status(500).json({
         success: false,
-        error: 'Registration failed'
+        error: 'Registration failed due to internal server error'
       });
     }
   }

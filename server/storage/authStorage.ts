@@ -119,12 +119,6 @@ export class AuthStorage {
       .where(eq(users.id, userId));
   }
 
-  static async revokeAllUserRefreshTokens(userId: number): Promise<void> {
-    await db.update(refreshTokens)
-      .set({ revoked: true })
-      .where(eq(refreshTokens.userId, userId));
-  }
-
   static async deleteUser(userId: number): Promise<void> {
     // First revoke all refresh tokens
     await this.revokeAllUserRefreshTokens(userId);

@@ -1,0 +1,48 @@
+I have a Node.js + TypeScript backend running on Replit using Express, Zod, and a custom AuthStorage for authentication. My registration endpoint is not working correctly. I want you to:
+
+1. Review my AuthController.register method.
+2. Add proper validation for email and password.
+3. Ensure database insertion works and returns the new user.
+4. Add detailed console logs at every step to debug the issue.
+5. Handle errors gracefully, returning clear responses for invalid emails, weak passwords, existing users, or internal errors.
+6. Make it Replit-friendly (consider environment variables, DB connections, and async behavior).
+
+Here is my current register method:
+
+```ts
+static async register(req: Request, res: Response): Promise<void> {
+    try {
+        const validatedData = registerSchema.parse(req.body);
+        const { email, password } = validatedData;
+        const normalizedEmail = email.toLowerCase().trim();
+        if (!validateEmail(normalizedEmail)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid email format',
+                code: ERROR_CODES.INVALID_EMAIL
+            });
+        }
+        const existingUser = await AuthStorage.getUserByEmail(normalizedEmail);
+        if (existingUser) {
+            return res.status(400).json(AUTH_ERRORS.emailExists());
+        }
+        const passwordValidation = validatePassword(password);
+        if (!passwordValidation.isValid) {
+            return res.status(400).json(AUTH_ERRORS.weakPassword(passwordValidation.errors));
+        }
+        const newUser = await AuthStorage.createUser({
+            email: normalizedEmail,
+            password: await hashPassword(password),
+        });
+        res.status(201).json({
+            success: true,
+            data: {
+                id: newUser.id,
+                email: newUser.email,
+            }
+        });
+    } catch (error) {
+        logger.error('Registration error:', error);
+        res.status(500).json({ success: false, error: 'Internal Server Error' });
+    }
+}
