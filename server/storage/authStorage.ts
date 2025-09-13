@@ -25,7 +25,8 @@ export class AuthStorage {
   }
 
   static async createUser(userData: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(userData).returning();
+    // Type assertion to bridge Zod schema type with Drizzle insert type
+    const [user] = await db.insert(users).values(userData as typeof users.$inferInsert).returning();
     return user;
   }
 
