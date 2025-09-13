@@ -1,9 +1,7 @@
 import express from 'express';
-import * as UserController from './controllers/userController';
-import * as CourseController from './controllers/courseController';
-import * as GameController from './controllers/gameController';
 import * as AIController from './controllers/aiController';
 import { AuthController } from './controllers/authController';
+import { authenticateJWT, requireAuth, requireAdmin, requireInstructor } from './middleware/auth';
 import { generalLimiter, aiLimiter } from './middleware/rateLimiter';
 import { asyncHandler } from './middleware/errorHandler';
 
@@ -24,97 +22,109 @@ router.get('/health', (req, res) => {
 // AI Service health check
 router.get('/health/ai', asyncHandler(AIController.healthCheck));
 
-// ===== AUTHENTICATION ROUTES REMOVED =====
-// All authentication routes have been removed during system rebuild
-// They will be replaced with clean implementation
+// ===== AUTHENTICATION ROUTES =====
+// Authentication rate limiting
+const authLimiter = generalLimiter;
 
-router.all('/auth/*', (req, res) => {
-  res.status(503).json({
-    success: false,
-    error: 'Authentication system is being rebuilt. Please check back shortly.',
-    message: 'All authentication endpoints are temporarily unavailable during system reconstruction.'
-  });
-});
+// Authentication routes
+router.post('/auth/register', authLimiter.middleware, asyncHandler(AuthController.register));
+router.post('/auth/login', authLimiter.middleware, asyncHandler(AuthController.login));
+router.post('/auth/refresh', asyncHandler(AuthController.refreshToken));
+router.post('/auth/logout', authenticateJWT, asyncHandler(AuthController.logout));
+
+// Google OAuth routes
+router.get('/auth/google', AuthController.googleAuth);
+router.get('/auth/google/callback', asyncHandler(AuthController.googleCallback));
+
+// Protected user routes
+router.get('/auth/me', authenticateJWT, requireAuth, asyncHandler(AuthController.getProfile));
+router.put('/auth/profile', authenticateJWT, requireAuth, asyncHandler(AuthController.updateProfile));
+router.put('/auth/change-password', authenticateJWT, requireAuth, asyncHandler(AuthController.changePassword));
 
 // ===== PUBLIC ROUTES (No Authentication Required) =====
 
-// Public course listings
-router.get('/courses', asyncHandler(CourseController.getAllCourses));
-router.get('/courses/:id', asyncHandler(CourseController.getCourse));
-
-// ===== PROTECTED ROUTES TEMPORARILY DISABLED =====
-// All protected routes have been disabled during authentication system rebuild
-// They will be re-enabled with proper authentication in the next phase
-
-router.all('/admin/*', (req, res) => {
-  res.status(503).json({
-    success: false,
-    error: 'Admin features temporarily unavailable during authentication rebuild.'
+// Public course listings (placeholder)
+router.get('/courses', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Course endpoints will be restored after authentication system is complete',
+    data: []
   });
 });
 
-router.all('/instructor/*', (req, res) => {
-  res.status(503).json({
-    success: false,
-    error: 'Instructor features temporarily unavailable during authentication rebuild.'
+router.get('/courses/:id', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Course details endpoint will be restored after authentication system is complete',
+    data: null
   });
 });
 
-router.all('/student/*', (req, res) => {
+// ===== PROTECTED ROUTES PLACEHOLDERS =====
+// All protected routes return 503 until authentication system is fully integrated
+
+router.all('/admin/*', authenticateJWT, requireAdmin, (req, res) => {
   res.status(503).json({
     success: false,
-    error: 'Student features temporarily unavailable during authentication rebuild.'
+    error: 'Admin features will be restored after authentication system integration is complete.'
   });
 });
 
-router.all('/courses/:id/enroll', (req, res) => {
+router.all('/instructor/*', authenticateJWT, requireInstructor, (req, res) => {
   res.status(503).json({
     success: false,
-    error: 'Course enrollment temporarily unavailable during authentication rebuild.'
+    error: 'Instructor features will be restored after authentication system integration is complete.'
   });
 });
 
-router.all('/courses/:id/lessons/*', (req, res) => {
+router.all('/student/*', authenticateJWT, requireAuth, (req, res) => {
   res.status(503).json({
     success: false,
-    error: 'Course lessons temporarily unavailable during authentication rebuild.'
+    error: 'Student features will be restored after authentication system integration is complete.'
   });
 });
 
-router.all('/gamification/*', (req, res) => {
+router.all('/courses/:id/enroll', authenticateJWT, requireAuth, (req, res) => {
   res.status(503).json({
     success: false,
-    error: 'Gamification features temporarily unavailable during authentication rebuild.'
+    error: 'Course enrollment will be restored after authentication system integration is complete.'
+  });
+});
+
+router.all('/gamification/*', authenticateJWT, requireAuth, (req, res) => {
+  res.status(503).json({
+    success: false,
+    error: 'Gamification features will be restored after authentication system integration is complete.'
   });
 });
 
 router.all('/peer-help/*', (req, res) => {
   res.status(503).json({
     success: false,
-    error: 'Peer help features temporarily unavailable during authentication rebuild.'
+    error: 'Peer help features will be restored after authentication system integration is complete.'
   });
 });
 
-router.all('/ai/*', (req, res) => {
+router.all('/ai/*', authenticateJWT, requireAuth, (req, res) => {
   res.status(503).json({
     success: false,
-    error: 'AI features temporarily unavailable during authentication rebuild.'
+    error: 'AI features will be restored after authentication system integration is complete.'
   });
 });
 
-router.all('/video/*', (req, res) => {
+router.all('/video/*', authenticateJWT, requireAuth, (req, res) => {
   res.status(503).json({
     success: false,
-    error: 'Video features temporarily unavailable during authentication rebuild.'
+    error: 'Video features will be restored after authentication system integration is complete.'
   });
 });
 
 // Catch-all for any other protected routes
 router.all('*', (req, res) => {
   if (req.path.startsWith('/api/')) {
-    res.status(503).json({
+    res.status(404).json({
       success: false,
-      error: 'This API endpoint is temporarily unavailable during authentication system rebuild.'
+      error: 'API endpoint not found'
     });
   } else {
     res.status(404).json({

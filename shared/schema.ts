@@ -1,20 +1,28 @@
-import { pgTable, text, serial, integer, boolean, timestamp, decimal, json } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, decimal, json, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
-// Users table
+// Users table - Modified for production authentication system
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-  fullName: text("full_name").notNull(),
+  // Core authentication fields
   email: text("email").notNull().unique(),
+  passwordHash: text("password_hash"), // Nullable for OAuth-only users
+  name: text("name").notNull(), // Replaces fullName for simplicity
+  imageUrl: text("image_url"), // Profile picture from OAuth or upload
+  
+  // OAuth provider fields
+  provider: text("provider", { enum: ['local', 'google'] }).notNull().default('local'),
+  providerId: text("provider_id"), // Google ID, etc.
+  emailVerifiedAt: timestamp("email_verified_at"),
+  
+  // Application-specific fields
   role: text("role", { enum: ['student', 'instructor', 'admin'] }).notNull().default('student'),
   domain: text("domain"),
   branch: text("branch"),
   year: text("year"),
-  avatar: text("avatar"),
+  
   // Instructor-specific fields
   instructorStatus: text("instructor_status", { enum: ['pending', 'approved', 'rejected'] }),
   expertiseAreas: json("expertise_areas").$type<string[]>().default([]),
@@ -25,8 +33,29 @@ export const users = pgTable("users", {
   personalWebsite: text("personal_website"),
   qualifications: json("qualifications").$type<string[]>().default([]),
   verificationDate: timestamp("verification_date"),
+  
+  // Timestamps
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  emailIdx: index("users_email_idx").on(table.email),
+  providerIdx: index("users_provider_idx").on(table.provider, table.providerId),
+}));
+
+// Refresh tokens table for JWT management
+export const refreshTokens = pgTable("refresh_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  jti: text("jti").notNull().unique(), // JWT ID for token tracking
+  revoked: boolean("revoked").default(false).notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  userAgent: text("user_agent"),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  jtiIdx: index("refresh_tokens_jti_idx").on(table.jti),
+  userIdIdx: index("refresh_tokens_user_id_idx").on(table.userId),
+}));
 
 // Instructor Invites table for admin-controlled instructor access
 export const instructorInvites = pgTable("instructor_invites", {
@@ -284,16 +313,19 @@ export const lessonsRelations = relations(lessons, ({ one, many }) => ({
 }));
 
 // Insert schemas
+// Authentication schemas for production auth system
 export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
-  fullName: true,
   email: true,
+  passwordHash: true,
+  name: true,
+  imageUrl: true,
+  provider: true,
+  providerId: true,
+  emailVerifiedAt: true,
   role: true,
   domain: true,
   branch: true,
   year: true,
-  avatar: true,
   instructorStatus: true,
   expertiseAreas: true,
   bio: true,
@@ -304,8 +336,44 @@ export const insertUserSchema = createInsertSchema(users).pick({
   qualifications: true,
 });
 
-// Instructor-specific schemas
-export const instructorSignupSchema = insertUserSchema.extend({
+export const insertRefreshTokenSchema = createInsertSchema(refreshTokens).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Auth-specific validation schemas
+export const registerSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters").max(128),
+  name: z.string().min(2, "Name must be at least 2 characters").max(100),
+  role: z.enum(['student', 'instructor']).optional().default('student'),
+  domain: z.string().optional(),
+  branch: z.string().optional(),
+  year: z.string().optional(),
+});
+
+export const loginSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(8, "New password must be at least 8 characters").max(128),
+});
+
+export const updateProfileSchema = z.object({
+  name: z.string().min(2).max(100).optional(),
+  domain: z.string().optional(),
+  branch: z.string().optional(),
+  year: z.string().optional(),
+  bio: z.string().max(500).optional(),
+  linkedinProfile: z.string().url().optional().or(z.literal("")),
+  personalWebsite: z.string().url().optional().or(z.literal("")),
+});
+
+// Instructor-specific schemas - updated for new schema
+export const instructorSignupSchema = registerSchema.extend({
   expertiseAreas: z.array(z.string()).min(1, "At least one expertise area is required"),
   bio: z.string().min(50, "Bio must be at least 50 characters"),
   teachingExperience: z.number().min(0, "Teaching experience must be 0 or greater"),
@@ -315,14 +383,14 @@ export const instructorSignupSchema = insertUserSchema.extend({
 });
 
 export const instructorProfileUpdateSchema = createInsertSchema(users).pick({
-  fullName: true,
+  name: true,
   bio: true,
   expertiseAreas: true,
   teachingExperience: true,
   linkedinProfile: true,
   personalWebsite: true,
   qualifications: true,
-  avatar: true,
+  imageUrl: true,
 });
 
 // Instructor invite schemas
@@ -691,9 +759,7 @@ export const insertQuizAttemptSchema = createInsertSchema(quizAttempts).omit({
   timeSpent: true,
 });
 
-// Types
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+// Types (User types moved to end of file to avoid duplicates)
 export type InsertCourse = z.infer<typeof insertCourseSchema>;
 export type Course = typeof courses.$inferSelect;
 export type InsertModule = z.infer<typeof insertModuleSchema>;
@@ -878,3 +944,11 @@ export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type UserUnlock = typeof userUnlocks.$inferSelect;
 export type AIMentorResponse = typeof aiMentorResponses.$inferSelect;
+
+// Authentication type exports
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type RegisterUser = z.infer<typeof registerSchema>;
+export type LoginUser = z.infer<typeof loginSchema>;
+export type RefreshToken = typeof refreshTokens.$inferSelect;
+export type InsertRefreshToken = z.infer<typeof insertRefreshTokenSchema>;

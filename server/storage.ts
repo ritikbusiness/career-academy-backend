@@ -1,13 +1,13 @@
 import { 
   users, courses, modules, lessons, enrollments, userStats, achievements, userAchievements,
   helpCategories, helpQuestions, helpAnswers, xpTransactions, learningAnalytics,
-  subscriptionPlans, userSubscriptions, discountCoupons, instructorInvites,
+  subscriptionPlans, userSubscriptions, discountCoupons, instructorInvites, refreshTokens,
   type User, type InsertUser, type Course, type InsertCourse, type Module, type InsertModule,
   type Lesson, type InsertLesson, type Enrollment, type InsertEnrollment,
   type UserStats, type InsertUserStats, type Achievement, type InsertAchievement,
   type HelpQuestion, type InsertHelpQuestion, type HelpAnswer, type InsertHelpAnswer,
   type HelpCategory, type XpTransaction, type LearningAnalytics, type InstructorInvite,
-  type InsertInstructorInvite
+  type InsertInstructorInvite, type RefreshToken, type InsertRefreshToken
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, like, sql, count } from "drizzle-orm";
@@ -15,12 +15,22 @@ import { eq, desc, asc, and, or, like, sql, count } from "drizzle-orm";
 export interface IStorage {
   // User management
   getUser(id: number): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  getUserByEmail?(email: string): Promise<User | undefined>;
+  getUserByUsername?(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByProviderId?(provider: string, providerId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser?(id: number, updates: Partial<User>): Promise<User>;
   updateUserProfile?(data: any): Promise<User>;
   updateUserPassword?(userId: number, hashedPassword: string): Promise<void>;
   updateUserActivity?(userId: number): Promise<void>;
+  linkProvider?(userId: number, provider: string, providerId: string): Promise<void>;
+
+  // Authentication & refresh token management  
+  createRefreshToken(token: InsertRefreshToken): Promise<RefreshToken>;
+  getRefreshTokenByJti(jti: string): Promise<RefreshToken | undefined>;
+  revokeRefreshToken(jti: string): Promise<void>;
+  revokeAllUserRefreshTokens(userId: number): Promise<void>;
+  cleanupExpiredRefreshTokens?(): Promise<void>;
 
   // User stats and gamification
   getUserStats?(userId: number): Promise<UserStats | undefined>;

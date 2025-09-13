@@ -12,17 +12,22 @@ import { setupVite, serveStatic, log } from "./vite";
 import { errorHandler, notFound } from "./middleware/errorHandler";
 import { apiLogger } from "./utils/logger";
 import cors from "cors";
-// import passport from './config/passport'; // Removed during auth rebuild
+import passport from './config/passport';
+import cookieParser from 'cookie-parser';
 
 const app = express();
 
 // Middleware setup
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5000',
+  credentials: true // Enable cookies for authentication
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+app.use(cookieParser()); // Enable cookie parsing for refresh tokens
 
-// Initialize Passport - Disabled during auth rebuild
-// app.use(passport.initialize());
+// Initialize Passport
+app.use(passport.initialize());
 
 app.use((req, res, next) => {
   const start = Date.now();

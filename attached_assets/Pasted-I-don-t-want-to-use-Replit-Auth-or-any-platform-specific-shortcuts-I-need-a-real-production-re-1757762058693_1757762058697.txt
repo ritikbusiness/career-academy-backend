@@ -1,0 +1,47 @@
+I don’t want to use Replit Auth or any platform-specific shortcuts.  
+I need a **real, production-ready authentication system** that works on any server (including Ubuntu).  
+
+Here is the plan you must implement (backend + frontend):
+
+### Backend (Node.js + Express + Passport.js)
+1. Create a proper `User` model and database schema with fields:
+   - id, name, email, password (hashed), provider (local/google), createdAt, updatedAt.
+2. Implement **secure email/password registration**:
+   - Hash password with bcrypt before saving.
+   - Validate unique email.
+3. Implement **secure login endpoint**:
+   - Compare hashed password.
+   - Return JWT session tokens.
+4. Create **authentication middleware** that validates JWT and protects routes.
+5. Add **Google OAuth (Passport.js)**:
+   - Load `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_CALLBACK_URL` from `.env`.
+   - In the Google strategy callback:
+     - If the email exists → log in user.
+     - If not → create new user with their real Gmail and displayName.
+   - No hardcoded emails (`john@example.com`) allowed.
+6. Implement `passport.serializeUser` and `passport.deserializeUser` properly.
+
+### Frontend (React)
+1. Build a new **login form** (email/password + Google login button).
+2. Build a **signup form** (email/password registration).
+3. Create an **authentication context** to store user session state.
+4. Properly handle login/logout state, show user data, and protect routes.
+
+### Integration & Testing
+- Test email/password registration & login.
+- Test Google OAuth flow → must open Google account chooser.
+- Verify real Gmail gets saved in the database.
+- Ensure errors are handled gracefully.
+
+### Requirements
+- Use JWT for sessions (so it works on Ubuntu server, not just Replit).
+- No hardcoding of credentials or test emails.
+- Load all sensitive values from `.env`.
+- The system must be portable and deployable on Ubuntu with Node.js and a database.
+
+Expected Outcome:
+✅ Users can register/login with email+password.  
+✅ Users can sign in with Google and real Gmail is saved.  
+✅ JWT-based secure sessions.  
+✅ Works on any server (Ubuntu, AWS, etc).  
+✅ Production-ready authentication system.
