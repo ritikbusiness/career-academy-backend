@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import passport from 'passport';
 import { AuthStorage } from '../storage/authStorage';
 import { hashPassword, generateAccessToken, generateRefreshToken, verifyRefreshToken, getCookieOptions, validateEmail, validatePassword, sanitizeUserData } from '../utils/auth';
+import { AUTH_ERRORS, createSuccessResponse, ERROR_CODES } from '../utils/errors';
 import { registerSchema, loginSchema, changePasswordSchema, updateProfileSchema } from '@shared/schema';
 import { logger } from '../utils/logger';
 import { AuthRequest } from '../middleware/auth';
@@ -21,7 +22,8 @@ export class AuthController {
       if (!validateEmail(normalizedEmail)) {
         res.status(400).json({
           success: false,
-          error: 'Invalid email format'
+          error: 'Invalid email format',
+          code: ERROR_CODES.INVALID_EMAIL
         });
         return;
       }
@@ -29,21 +31,14 @@ export class AuthController {
       // Validate password strength
       const passwordValidation = validatePassword(password);
       if (!passwordValidation.isValid) {
-        res.status(400).json({
-          success: false,
-          error: 'Password validation failed',
-          details: passwordValidation.errors
-        });
+        res.status(400).json(AUTH_ERRORS.weakPassword(passwordValidation.errors));
         return;
       }
 
       // Check if user already exists
       const existingUser = await AuthStorage.getUserByEmail(normalizedEmail);
       if (existingUser) {
-        res.status(409).json({
-          success: false,
-          error: 'User with this email already exists'
-        });
+        res.status(409).json(AUTH_ERRORS.emailExists());
         return;
       }
 

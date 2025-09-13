@@ -44,7 +44,12 @@ export const generateRefreshToken = (userId: number): { token: string; jti: stri
     jti
   };
   
-  const token = jwt.sign(payload, config.JWT_REFRESH_SECRET, {
+  const secret = config.JWT_REFRESH_SECRET;
+  if (!secret) {
+    throw new Error('JWT_REFRESH_SECRET is required for refresh token generation');
+  }
+  
+  const token = jwt.sign(payload, secret, {
     expiresIn: '7d', // Long-lived refresh token
     issuer: 'lms-auth',
     audience: 'lms-api'
@@ -72,8 +77,13 @@ export const verifyAccessToken = (token: string): JWTPayload => {
 };
 
 export const verifyRefreshToken = (token: string): RefreshTokenPayload => {
+  const secret = config.JWT_REFRESH_SECRET;
+  if (!secret) {
+    throw new Error('JWT_REFRESH_SECRET is required for refresh token verification');
+  }
+  
   try {
-    const payload = jwt.verify(token, config.JWT_REFRESH_SECRET, {
+    const payload = jwt.verify(token, secret, {
       issuer: 'lms-auth',
       audience: 'lms-api'
     }) as RefreshTokenPayload;
@@ -91,14 +101,14 @@ export const verifyRefreshToken = (token: string): RefreshTokenPayload => {
 
 // Cookie utilities
 export const getCookieOptions = (maxAge?: number) => {
-  const isProduction = process.env.NODE_ENV === 'production';
-  const domain = process.env.COOKIE_DOMAIN;
+  const isProduction = config.NODE_ENV === 'production';
+  const domain = config.COOKIE_DOMAIN;
   
   return {
     httpOnly: true,
     secure: isProduction, // HTTPS only in production
     sameSite: 'lax' as const,
-    domain: domain || undefined,
+    domain: domain && domain !== 'localhost' ? domain : undefined,
     maxAge: maxAge || 7 * 24 * 60 * 60 * 1000, // 7 days default
     path: '/'
   };
@@ -109,6 +119,26 @@ export const validateEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 };
+
+// Common weak passwords list (top 100 most common)
+const COMMON_PASSWORDS = new Set([
+  'password', '123456', '123456789', 'welcome', 'admin', 'password123', 'root', 'toor',
+  'pass', '12345678', '123123', '1234567890', 'qwerty', 'abc123', 'Password1',
+  'password1', 'admin123', 'root123', 'welcome123', '1qaz2wsx', 'dragon',
+  'master', 'monkey', 'letmein', 'login', 'princess', 'qwertyuiop', 'solo',
+  'sunshine', 'secret', 'freedom', 'whatever', 'qazwsx', 'football', 'jesus',
+  'michael', 'ninja', 'mustang', 'password12', 'shadow', 'master123', '696969',
+  'superman', 'michael1', 'batman', 'trustno1', 'thomas', 'robert', 'jesus1',
+  'abcdef', 'matrix', 'cheese', 'hunter', 'buster', 'killer', 'soccer',
+  'harley', 'ranger', 'jordan', 'andrew', 'charles', 'daniel', 'compaq',
+  'merlin', 'starwars', 'computer', 'michelle', 'jessica', 'pepper', 'test',
+  'changeme', 'fuckme', 'fuckyou', 'pussy', 'andrea', 'joshua', 'love',
+  'amanda', 'ashley', 'bailey', 'passw0rd', 'shadow1', 'power', 'fire',
+  'hammer', 'diamond', 'important', 'secure', 'welcome1', 'admin1', 'system',
+  'manager', 'office', 'internet', 'service', 'hello', 'guest', 'university',
+  'default', 'money', 'coffee', 'house', 'family', 'business', 'music',
+  'student', 'forever', 'friend', 'orange', 'flower', 'beautiful', 'summer'
+]);
 
 export const validatePassword = (password: string): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
@@ -131,6 +161,15 @@ export const validatePassword = (password: string): { isValid: boolean; errors: 
   
   if (!/\d/.test(password)) {
     errors.push('Password must contain at least one number');
+  }
+  
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    errors.push('Password must contain at least one special character (!@#$%^&*...)');
+  }
+  
+  // Check against common passwords (case insensitive)
+  if (COMMON_PASSWORDS.has(password.toLowerCase())) {
+    errors.push('Password is too common. Please choose a more unique password');
   }
   
   return {
