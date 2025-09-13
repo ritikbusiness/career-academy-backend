@@ -66,9 +66,7 @@ const SignupForm = () => {
       
       toast({
         title: "Account created successfully",
-        description: data.data.emailVerificationSent 
-          ? "Please check your email to verify your account and unlock all features." 
-          : `Welcome to Desired Career Academy as a ${formData.role}!`,
+        description: "Please check your email to verify your account and unlock all features.",
       });
       
       navigate('/dashboard');
