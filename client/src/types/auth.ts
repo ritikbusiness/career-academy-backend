@@ -1,13 +1,13 @@
 
 export interface User {
   id: string;
-  fullName: string;
+  name: string; // Changed from fullName to match backend schema
   email: string;
   role: 'student' | 'instructor' | 'admin';
   domain?: string;
   branch?: string;
   year?: string;
-  avatar?: string;
+  imageUrl?: string; // Changed from avatar to match backend schema
   createdAt: string;
   // Instructor specific fields
   bio?: string;

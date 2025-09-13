@@ -84,7 +84,7 @@ const Header = () => {
                     <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
                       <User className="w-4 h-4 text-white" />
                     </div>
-                    <span className="hidden sm:block text-sm font-medium">{user.fullName}</span>
+                    <span className="hidden sm:block text-sm font-medium">{user.name}</span>
                   </Button>
                   
                   {/* Dropdown Menu */}
@@ -95,7 +95,7 @@ const Header = () => {
                           <User className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                          <p className="font-semibold text-gray-900">{user.fullName}</p>
+                          <p className="font-semibold text-gray-900">{user.name}</p>
                           <p className="text-sm text-gray-600">{user.email}</p>
                         </div>
                       </div>

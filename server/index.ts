@@ -75,11 +75,10 @@ app.use('/api', notFound);
   // Create HTTP server
   const server = createServer(app);
   
-  // Use production build to avoid Vite development server issues
+  // Use production build for stability
   serveStatic(app);
 
   // serve the app on port 5000 for Replit workflow compatibility
-  // this serves both the API and the client.
   const port = 5000;
   server.listen(port, "0.0.0.0", () => {
     console.log(`[express] serving on port ${port}`);

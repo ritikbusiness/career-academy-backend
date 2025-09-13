@@ -1,15 +1,693 @@
 var __defProp = Object.defineProperty;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
+// server/utils/logger.ts
+import winston from "winston";
+import fs from "fs";
+import path from "path";
+var logFormat, logger, apiLogger, logsDir;
+var init_logger = __esm({
+  "server/utils/logger.ts"() {
+    "use strict";
+    logFormat = winston.format.combine(
+      winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
+      winston.format.errors({ stack: true }),
+      winston.format.printf(({ timestamp: timestamp2, level, message, stack }) => {
+        return `${timestamp2} [${level.toUpperCase()}]: ${stack || message}`;
+      })
+    );
+    logger = winston.createLogger({
+      level: process.env.NODE_ENV === "production" ? "info" : "debug",
+      format: logFormat,
+      defaultMeta: { service: "lms-backend" },
+      transports: [
+        // Console transport for development
+        new winston.transports.Console({
+          format: winston.format.combine(
+            winston.format.colorize(),
+            logFormat
+          )
+        }),
+        // File transport for errors
+        new winston.transports.File({
+          filename: "logs/error.log",
+          level: "error",
+          maxsize: 5242880,
+          // 5MB
+          maxFiles: 5
+        }),
+        // File transport for all logs
+        new winston.transports.File({
+          filename: "logs/combined.log",
+          maxsize: 5242880,
+          // 5MB
+          maxFiles: 5
+        })
+      ],
+      // Handle exceptions and rejections
+      exceptionHandlers: [
+        new winston.transports.File({ filename: "logs/exceptions.log" })
+      ],
+      rejectionHandlers: [
+        new winston.transports.File({ filename: "logs/rejections.log" })
+      ]
+    });
+    apiLogger = (req, res, next) => {
+      const start = Date.now();
+      res.on("finish", () => {
+        const duration = Date.now() - start;
+        const logData = {
+          method: req.method,
+          url: req.originalUrl,
+          statusCode: res.statusCode,
+          duration: `${duration}ms`,
+          userAgent: req.get("User-Agent"),
+          ip: req.ip,
+          userId: req.user?.id || "anonymous"
+        };
+        if (res.statusCode >= 400) {
+          logger.error("API Error", logData);
+        } else {
+          logger.info("API Request", logData);
+        }
+      });
+      next();
+    };
+    logsDir = path.join(process.cwd(), "logs");
+    if (!fs.existsSync(logsDir)) {
+      fs.mkdirSync(logsDir, { recursive: true });
+    }
+  }
+});
+
+// server/utils/config.ts
+import { z as z2 } from "zod";
+var envSchema, validateConfig, config;
+var init_config = __esm({
+  "server/utils/config.ts"() {
+    "use strict";
+    envSchema = z2.object({
+      // Application
+      NODE_ENV: z2.enum(["development", "production", "test"]).default("development"),
+      PORT: z2.string().transform(Number).default("5000"),
+      FRONTEND_URL: z2.string().url().default("http://localhost:5000"),
+      SERVER_URL: z2.string().url().default("http://localhost:5000"),
+      // Database
+      DATABASE_URL: z2.string().min(1, "DATABASE_URL is required"),
+      // JWT Secrets
+      JWT_SECRET: z2.string().min(32, "JWT_SECRET must be at least 32 characters"),
+      JWT_REFRESH_SECRET: z2.string().min(32, "JWT_REFRESH_SECRET must be at least 32 characters").optional(),
+      // Authentication
+      BCRYPT_SALT_ROUNDS: z2.string().transform(Number).default("12"),
+      SESSION_SECRET: z2.string().optional(),
+      // Google OAuth
+      GOOGLE_CLIENT_ID: z2.string().min(1, "GOOGLE_CLIENT_ID is required for OAuth").optional(),
+      GOOGLE_CLIENT_SECRET: z2.string().min(1, "GOOGLE_CLIENT_SECRET is required for OAuth").optional(),
+      OAUTH_CALLBACK_URL: z2.string().url().default("http://localhost:5000/api/auth/google/callback"),
+      // Cookies
+      COOKIE_DOMAIN: z2.string().optional().default("localhost"),
+      // Optional
+      SMTP_HOST: z2.string().optional(),
+      SMTP_PORT: z2.string().transform(Number).optional(),
+      SMTP_USER: z2.string().optional(),
+      SMTP_PASS: z2.string().optional(),
+      SMTP_FROM: z2.string().optional()
+    });
+    validateConfig = () => {
+      try {
+        const config2 = envSchema.parse(process.env);
+        if (config2.NODE_ENV === "production") {
+          if (config2.FRONTEND_URL.includes("localhost")) {
+            throw new Error("FRONTEND_URL cannot be localhost in production");
+          }
+          if (config2.COOKIE_DOMAIN === "localhost") {
+            throw new Error("COOKIE_DOMAIN cannot be localhost in production");
+          }
+        }
+        return config2;
+      } catch (error) {
+        if (error instanceof z2.ZodError) {
+          const missingVars = error.errors.map((err) => `${err.path.join(".")}: ${err.message}`);
+          console.error("\u274C Environment validation failed:");
+          missingVars.forEach((msg) => console.error(`  - ${msg}`));
+          console.error("\n\u{1F4A1} Please check your .env file against .env.example");
+          process.exit(1);
+        }
+        throw error;
+      }
+    };
+    config = validateConfig();
+  }
+});
+
+// server/utils/auth.ts
+var auth_exports = {};
+__export(auth_exports, {
+  comparePassword: () => comparePassword,
+  generateAccessToken: () => generateAccessToken,
+  generatePasswordResetToken: () => generatePasswordResetToken,
+  generateRefreshToken: () => generateRefreshToken,
+  generateSecureToken: () => generateSecureToken,
+  getCookieOptions: () => getCookieOptions,
+  hashPassword: () => hashPassword,
+  sanitizeUserData: () => sanitizeUserData,
+  validateEmail: () => validateEmail,
+  validatePassword: () => validatePassword,
+  verifyAccessToken: () => verifyAccessToken,
+  verifyRefreshToken: () => verifyRefreshToken
+});
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { randomUUID } from "crypto";
+var hashPassword, comparePassword, generateAccessToken, generateRefreshToken, verifyAccessToken, verifyRefreshToken, getCookieOptions, validateEmail, COMMON_PASSWORDS, validatePassword, generateSecureToken, generatePasswordResetToken, sanitizeUserData;
+var init_auth = __esm({
+  "server/utils/auth.ts"() {
+    "use strict";
+    init_config();
+    hashPassword = async (password) => {
+      return await bcrypt.hash(password, config.BCRYPT_SALT_ROUNDS);
+    };
+    comparePassword = async (password, hash) => {
+      return await bcrypt.compare(password, hash);
+    };
+    generateAccessToken = (payload) => {
+      return jwt.sign(payload, config.JWT_SECRET, {
+        expiresIn: "15m",
+        // Short-lived access token
+        issuer: "lms-auth",
+        audience: "lms-api"
+      });
+    };
+    generateRefreshToken = (userId) => {
+      const jti = randomUUID();
+      const payload = {
+        userId,
+        jti
+      };
+      const secret = config.JWT_REFRESH_SECRET;
+      if (!secret) {
+        throw new Error("JWT_REFRESH_SECRET is required for refresh token generation");
+      }
+      const token = jwt.sign(payload, secret, {
+        expiresIn: "7d",
+        // Long-lived refresh token
+        issuer: "lms-auth",
+        audience: "lms-api"
+      });
+      return { token, jti };
+    };
+    verifyAccessToken = (token) => {
+      try {
+        const payload = jwt.verify(token, config.JWT_SECRET, {
+          issuer: "lms-auth",
+          audience: "lms-api"
+        });
+        return payload;
+      } catch (error) {
+        if (error instanceof jwt.TokenExpiredError) {
+          throw new Error("Access token expired");
+        } else if (error instanceof jwt.JsonWebTokenError) {
+          throw new Error("Invalid access token");
+        }
+        throw error;
+      }
+    };
+    verifyRefreshToken = (token) => {
+      const secret = config.JWT_REFRESH_SECRET;
+      if (!secret) {
+        throw new Error("JWT_REFRESH_SECRET is required for refresh token verification");
+      }
+      try {
+        const payload = jwt.verify(token, secret, {
+          issuer: "lms-auth",
+          audience: "lms-api"
+        });
+        return payload;
+      } catch (error) {
+        if (error instanceof jwt.TokenExpiredError) {
+          throw new Error("Refresh token expired");
+        } else if (error instanceof jwt.JsonWebTokenError) {
+          throw new Error("Invalid refresh token");
+        }
+        throw error;
+      }
+    };
+    getCookieOptions = (maxAge) => {
+      const isProduction = config.NODE_ENV === "production";
+      const domain = config.COOKIE_DOMAIN;
+      return {
+        httpOnly: true,
+        secure: isProduction,
+        // HTTPS only in production
+        sameSite: "lax",
+        domain: domain && domain !== "localhost" ? domain : void 0,
+        maxAge: maxAge || 7 * 24 * 60 * 60 * 1e3,
+        // 7 days default
+        path: "/"
+      };
+    };
+    validateEmail = (email) => {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return false;
+      }
+      const localPart = email.split("@")[0]?.toLowerCase();
+      const domain = email.split("@")[1]?.toLowerCase();
+      if (!localPart || !domain) {
+        return false;
+      }
+      const exactFakePatterns = [
+        "asdf",
+        "qwerty",
+        "zxcv",
+        "abcd",
+        "wxyz",
+        // Exact keyboard patterns
+        "test",
+        "fake",
+        "dummy",
+        "invalid",
+        "temp"
+        // Exact obvious fakes
+      ];
+      if (exactFakePatterns.includes(localPart) || exactFakePatterns.some((pattern) => localPart.startsWith(pattern) && /^\d+$/.test(localPart.slice(pattern.length)))) {
+        return false;
+      }
+      if (/^\d+$/.test(localPart)) {
+        return false;
+      }
+      const suspiciousDomains = [
+        "test.com",
+        "fake.com",
+        "invalid.com",
+        "dummy.com",
+        "temp.com",
+        "throwaway.email",
+        "10minutemail.com",
+        "mailinator.com",
+        "guerrillamail.com",
+        "yopmail.com",
+        "tempmail.org",
+        "dispostable.com"
+      ];
+      if (suspiciousDomains.includes(domain)) {
+        return false;
+      }
+      if (!domain.includes(".") || !/[a-z]/.test(domain)) {
+        return false;
+      }
+      return true;
+    };
+    COMMON_PASSWORDS = /* @__PURE__ */ new Set([
+      "password",
+      "123456",
+      "123456789",
+      "welcome",
+      "admin",
+      "password123",
+      "root",
+      "toor",
+      "pass",
+      "12345678",
+      "123123",
+      "1234567890",
+      "qwerty",
+      "abc123",
+      "Password1",
+      "password1",
+      "admin123",
+      "root123",
+      "welcome123",
+      "1qaz2wsx",
+      "dragon",
+      "master",
+      "monkey",
+      "letmein",
+      "login",
+      "princess",
+      "qwertyuiop",
+      "solo",
+      "sunshine",
+      "secret",
+      "freedom",
+      "whatever",
+      "qazwsx",
+      "football",
+      "jesus",
+      "michael",
+      "ninja",
+      "mustang",
+      "password12",
+      "shadow",
+      "master123",
+      "696969",
+      "superman",
+      "michael1",
+      "batman",
+      "trustno1",
+      "thomas",
+      "robert",
+      "jesus1",
+      "abcdef",
+      "matrix",
+      "cheese",
+      "hunter",
+      "buster",
+      "killer",
+      "soccer",
+      "harley",
+      "ranger",
+      "jordan",
+      "andrew",
+      "charles",
+      "daniel",
+      "compaq",
+      "merlin",
+      "starwars",
+      "computer",
+      "michelle",
+      "jessica",
+      "pepper",
+      "test",
+      "changeme",
+      "fuckme",
+      "fuckyou",
+      "pussy",
+      "andrea",
+      "joshua",
+      "love",
+      "amanda",
+      "ashley",
+      "bailey",
+      "passw0rd",
+      "shadow1",
+      "power",
+      "fire",
+      "hammer",
+      "diamond",
+      "important",
+      "secure",
+      "welcome1",
+      "admin1",
+      "system",
+      "manager",
+      "office",
+      "internet",
+      "service",
+      "hello",
+      "guest",
+      "university",
+      "default",
+      "money",
+      "coffee",
+      "house",
+      "family",
+      "business",
+      "music",
+      "student",
+      "forever",
+      "friend",
+      "orange",
+      "flower",
+      "beautiful",
+      "summer"
+    ]);
+    validatePassword = (password) => {
+      const errors = [];
+      if (password.length < 6) {
+        errors.push("Password must be at least 6 characters long");
+      }
+      if (password.length > 128) {
+        errors.push("Password must be less than 128 characters");
+      }
+      if (!/\d/.test(password)) {
+        errors.push("Password must contain at least one number");
+      }
+      if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+        errors.push("Password must contain at least one symbol (!@#$%^&*...)");
+      }
+      if (COMMON_PASSWORDS.has(password.toLowerCase())) {
+        errors.push("Password is too common. Please choose a more unique password");
+      }
+      return {
+        isValid: errors.length === 0,
+        errors
+      };
+    };
+    generateSecureToken = () => {
+      return randomUUID();
+    };
+    generatePasswordResetToken = () => {
+      return randomUUID() + "-" + Date.now();
+    };
+    sanitizeUserData = (user) => {
+      const { passwordHash, ...safeUser } = user;
+      return safeUser;
+    };
+  }
+});
+
+// server/utils/email.ts
+var email_exports = {};
+__export(email_exports, {
+  sendEmail: () => sendEmail,
+  sendPasswordResetEmail: () => sendPasswordResetEmail,
+  sendVerificationEmail: () => sendVerificationEmail
+});
+async function sendEmail(params) {
+  try {
+    logger.info("Email would be sent", {
+      to: params.to,
+      subject: params.subject,
+      mode: TOKEN_EXPOSE_MODE
+    });
+    if (IS_PRODUCTION && TOKEN_EXPOSE_MODE === "none") {
+      return { success: true };
+    }
+    if (TOKEN_EXPOSE_MODE === "console") {
+      console.log("\n" + "=".repeat(60));
+      console.log("\u{1F4E7} EMAIL WOULD BE SENT (Development Mode)");
+      console.log("=".repeat(60));
+      console.log(`To: ${params.to}`);
+      console.log(`From: ${params.from || DEFAULT_FROM_EMAIL}`);
+      console.log(`Subject: ${params.subject}`);
+      console.log("\nContent:");
+      console.log(params.text || "No text content");
+      console.log("=".repeat(60) + "\n");
+    }
+    return { success: true };
+  } catch (error) {
+    logger.error("Local email system error:", error);
+    return { success: false };
+  }
+}
+async function sendVerificationEmail(email, name, token) {
+  const baseUrl = process.env.FRONTEND_URL || "http://localhost:5000";
+  const verificationUrl = `${baseUrl}/verify-email?token=${token}`;
+  const text2 = `
+    Hi ${name},
+
+    Thank you for signing up for Desired Career Academy! 
+
+    To complete your registration, please verify your email address by visiting this link:
+    ${verificationUrl}
+
+    This verification link will expire in 24 hours.
+
+    If you didn't create an account with us, please ignore this email.
+
+    Welcome aboard!
+    The Desired Career Academy Team
+  `;
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Verify Your Email - Desired Career Academy</title>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .button { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+        .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Welcome to Desired Career Academy!</h1>
+        </div>
+        <div class="content">
+          <p>Hi ${name},</p>
+          <p>Thank you for signing up for Desired Career Academy! We're excited to have you join our learning community.</p>
+          <p>To complete your registration and start your learning journey, please verify your email address by clicking the button below:</p>
+          <p style="text-align: center;">
+            <a href="${verificationUrl}" class="button">Verify My Email</a>
+          </p>
+          <p>If the button doesn't work, you can also copy and paste this link into your browser:</p>
+          <p style="word-break: break-all; background: #eee; padding: 10px; border-radius: 5px;">${verificationUrl}</p>
+          <p><strong>Important:</strong> This verification link will expire in 24 hours for security reasons.</p>
+          <p>If you didn't create an account with us, please ignore this email.</p>
+          <p>Welcome aboard!</p>
+          <p>The Desired Career Academy Team</p>
+        </div>
+        <div class="footer">
+          <p>This email was sent to ${email}</p>
+          <p>\xA9 2025 Desired Career Academy. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+  const result = await sendEmail({
+    to: email,
+    subject: "Verify Your Email - Desired Career Academy",
+    text: text2,
+    html
+  });
+  if (TOKEN_EXPOSE_MODE === "console") {
+    console.log("\n\u{1F517} VERIFICATION LINK (Copy to test):");
+    console.log(verificationUrl);
+    console.log(`\u{1F3AB} Token: ${token}
+`);
+  }
+  if (TOKEN_EXPOSE_MODE === "response" && !IS_PRODUCTION) {
+    return {
+      success: result.success,
+      testData: {
+        token,
+        verificationUrl,
+        mode: TOKEN_EXPOSE_MODE
+      }
+    };
+  }
+  return result.success;
+}
+async function sendPasswordResetEmail(email, name, token) {
+  const baseUrl = process.env.FRONTEND_URL || "http://localhost:5000";
+  const resetUrl = `${baseUrl}/reset-password?token=${token}`;
+  const text2 = `
+    Hi ${name},
+
+    We received a request to reset your password for your Desired Career Academy account.
+
+    If you requested this password reset, visit this link to create a new password:
+    ${resetUrl}
+
+    IMPORTANT:
+    - This link will expire in 30 minutes
+    - If you didn't request this reset, please ignore this email
+    - This link can only be used once
+
+    Stay secure!
+    The Desired Career Academy Team
+  `;
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Reset Your Password - Desired Career Academy</title>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .button { display: inline-block; background: #e74c3c; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+        .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
+        .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Password Reset Request</h1>
+        </div>
+        <div class="content">
+          <p>Hi ${name},</p>
+          <p>We received a request to reset your password for your Desired Career Academy account.</p>
+          <p>If you requested this password reset, click the button below to create a new password:</p>
+          <p style="text-align: center;">
+            <a href="${resetUrl}" class="button">Reset My Password</a>
+          </p>
+          <p>If the button doesn't work, you can also copy and paste this link into your browser:</p>
+          <p style="word-break: break-all; background: #eee; padding: 10px; border-radius: 5px;">${resetUrl}</p>
+          <div class="warning">
+            <p><strong>Important Security Information:</strong></p>
+            <ul>
+              <li>This password reset link will expire in 30 minutes</li>
+              <li>If you didn't request this password reset, please ignore this email</li>
+              <li>For security, this link can only be used once</li>
+            </ul>
+          </div>
+          <p>If you're having trouble accessing your account or didn't request this reset, please contact our support team.</p>
+          <p>Stay secure!</p>
+          <p>The Desired Career Academy Team</p>
+        </div>
+        <div class="footer">
+          <p>This email was sent to ${email}</p>
+          <p>\xA9 2025 Desired Career Academy. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+  const result = await sendEmail({
+    to: email,
+    subject: "Reset Your Password - Desired Career Academy",
+    text: text2,
+    html
+  });
+  if (TOKEN_EXPOSE_MODE === "console") {
+    console.log("\n\u{1F512} PASSWORD RESET LINK (Copy to test):");
+    console.log(resetUrl);
+    console.log(`\u{1F3AB} Token: ${token}
+`);
+  }
+  if (TOKEN_EXPOSE_MODE === "response" && !IS_PRODUCTION) {
+    return {
+      success: result.success,
+      testData: {
+        token,
+        resetUrl,
+        mode: TOKEN_EXPOSE_MODE
+      }
+    };
+  }
+  return result.success;
+}
+var DEFAULT_FROM_EMAIL, TOKEN_EXPOSE_MODE, IS_PRODUCTION;
+var init_email = __esm({
+  "server/utils/email.ts"() {
+    "use strict";
+    init_logger();
+    DEFAULT_FROM_EMAIL = process.env.FROM_EMAIL || "noreply@desiredcareeracademy.com";
+    TOKEN_EXPOSE_MODE = process.env.TOKEN_EXPOSE_MODE || "console";
+    IS_PRODUCTION = process.env.NODE_ENV === "production";
+  }
+});
+
 // server/index.ts
+import "dotenv/config";
 import express3 from "express";
 import { createServer } from "http";
 
 // server/routes.ts
 import express from "express";
+
+// server/db.ts
+import { Pool, neonConfig } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import ws from "ws";
 
 // shared/schema.ts
 var schema_exports = {};
@@ -23,10 +701,12 @@ __export(schema_exports, {
   assignments: () => assignments,
   bookmarks: () => bookmarks,
   certificates: () => certificates,
+  changePasswordSchema: () => changePasswordSchema,
   couponUsage: () => couponUsage,
   courseReviews: () => courseReviews,
   courses: () => courses,
   coursesRelations: () => coursesRelations,
+  createInstructorInviteSchema: () => createInstructorInviteSchema,
   discountCoupons: () => discountCoupons,
   enrollments: () => enrollments,
   forumReplies: () => forumReplies,
@@ -56,17 +736,22 @@ __export(schema_exports, {
   insertNotificationSchema: () => insertNotificationSchema,
   insertQuizAttemptSchema: () => insertQuizAttemptSchema,
   insertQuizSchema: () => insertQuizSchema,
+  insertRefreshTokenSchema: () => insertRefreshTokenSchema,
   insertSkillProgressSchema: () => insertSkillProgressSchema,
   insertStudyGroupSchema: () => insertStudyGroupSchema,
   insertSubscriptionPlanSchema: () => insertSubscriptionPlanSchema,
   insertUserSchema: () => insertUserSchema,
   insertUserStatsSchema: () => insertUserStatsSchema,
+  instructorInvites: () => instructorInvites,
+  instructorProfileUpdateSchema: () => instructorProfileUpdateSchema,
+  instructorSignupSchema: () => instructorSignupSchema,
   leaderboards: () => leaderboards,
   learningAnalytics: () => learningAnalytics,
   lessonNotes: () => lessonNotes,
   lessons: () => lessons,
   lessonsRelations: () => lessonsRelations,
   liveSessions: () => liveSessions,
+  loginSchema: () => loginSchema,
   missionProgress: () => missionProgress,
   missions: () => missions,
   modules: () => modules,
@@ -75,35 +760,89 @@ __export(schema_exports, {
   questionRooms: () => questionRooms,
   quizAttempts: () => quizAttempts,
   quizzes: () => quizzes,
+  refreshTokens: () => refreshTokens,
+  registerSchema: () => registerSchema,
   roomParticipants: () => roomParticipants,
   skillProgress: () => skillProgress,
   studyGroupMembers: () => studyGroupMembers,
   studyGroups: () => studyGroups,
   subscriptionPlans: () => subscriptionPlans,
+  updateProfileSchema: () => updateProfileSchema,
   userAchievements: () => userAchievements,
   userStats: () => userStats,
   userSubscriptions: () => userSubscriptions,
   userUnlocks: () => userUnlocks,
   users: () => users,
   usersRelations: () => usersRelations,
+  validateInstructorInviteSchema: () => validateInstructorInviteSchema,
   weeklyLearningStats: () => weeklyLearningStats,
   xpTransactions: () => xpTransactions
 });
-import { pgTable, text, serial, integer, boolean, timestamp, decimal, json } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, decimal, json, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
 import { relations } from "drizzle-orm";
 var users = pgTable("users", {
   id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-  fullName: text("full_name").notNull(),
+  // Core authentication fields
   email: text("email").notNull().unique(),
+  passwordHash: text("password_hash"),
+  // Nullable for OAuth-only users
+  name: text("name").notNull(),
+  // Replaces fullName for simplicity
+  imageUrl: text("image_url"),
+  // Profile picture from OAuth or upload
+  // OAuth provider fields
+  provider: text("provider", { enum: ["local", "google"] }).notNull().default("local"),
+  providerId: text("provider_id"),
+  // Google ID, etc.
+  emailVerifiedAt: timestamp("email_verified_at"),
+  // Application-specific fields
   role: text("role", { enum: ["student", "instructor", "admin"] }).notNull().default("student"),
   domain: text("domain"),
   branch: text("branch"),
   year: text("year"),
-  avatar: text("avatar"),
+  // Instructor-specific fields
+  instructorStatus: text("instructor_status", { enum: ["pending", "approved", "rejected"] }),
+  expertiseAreas: json("expertise_areas").$type().default([]),
+  bio: text("bio"),
+  credentialsUrl: text("credentials_url"),
+  teachingExperience: integer("teaching_experience"),
+  linkedinProfile: text("linkedin_profile"),
+  personalWebsite: text("personal_website"),
+  qualifications: json("qualifications").$type().default([]),
+  verificationDate: timestamp("verification_date"),
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => ({
+  emailIdx: index("users_email_idx").on(table.email),
+  providerIdx: index("users_provider_idx").on(table.provider, table.providerId)
+}));
+var refreshTokens = pgTable("refresh_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  jti: text("jti").notNull().unique(),
+  // JWT ID for token tracking
+  revoked: boolean("revoked").default(false).notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  userAgent: text("user_agent"),
+  ipAddress: text("ip_address"),
   createdAt: timestamp("created_at").defaultNow().notNull()
+}, (table) => ({
+  jtiIdx: index("refresh_tokens_jti_idx").on(table.jti),
+  userIdIdx: index("refresh_tokens_user_id_idx").on(table.userId)
+}));
+var instructorInvites = pgTable("instructor_invites", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  email: text("email").notNull(),
+  invitedBy: integer("invited_by").references(() => users.id).notNull(),
+  isUsed: boolean("is_used").default(false).notNull(),
+  usedBy: integer("used_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at")
 });
 var courses = pgTable("courses", {
   id: serial("id").primaryKey(),
@@ -322,15 +1061,79 @@ var lessonsRelations = relations(lessons, ({ one, many }) => ({
   quizzes: many(quizzes)
 }));
 var insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
-  fullName: true,
   email: true,
+  passwordHash: true,
+  name: true,
+  imageUrl: true,
+  provider: true,
+  providerId: true,
+  emailVerifiedAt: true,
   role: true,
   domain: true,
   branch: true,
   year: true,
-  avatar: true
+  instructorStatus: true,
+  expertiseAreas: true,
+  bio: true,
+  credentialsUrl: true,
+  teachingExperience: true,
+  linkedinProfile: true,
+  personalWebsite: true,
+  qualifications: true
+});
+var insertRefreshTokenSchema = createInsertSchema(refreshTokens).omit({
+  id: true,
+  createdAt: true
+});
+var registerSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters").max(128),
+  name: z.string().min(2, "Name must be at least 2 characters").max(100),
+  role: z.enum(["student", "instructor"]).optional().default("student"),
+  domain: z.string().optional(),
+  branch: z.string().optional(),
+  year: z.string().optional()
+});
+var loginSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(1, "Password is required")
+});
+var changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(8, "New password must be at least 8 characters").max(128)
+});
+var updateProfileSchema = z.object({
+  name: z.string().min(2).max(100).optional(),
+  domain: z.string().optional(),
+  branch: z.string().optional(),
+  year: z.string().optional(),
+  bio: z.string().max(500).optional(),
+  linkedinProfile: z.string().url().optional().or(z.literal("")),
+  personalWebsite: z.string().url().optional().or(z.literal(""))
+});
+var instructorSignupSchema = registerSchema.extend({
+  expertiseAreas: z.array(z.string()).min(1, "At least one expertise area is required"),
+  bio: z.string().min(50, "Bio must be at least 50 characters"),
+  teachingExperience: z.number().min(0, "Teaching experience must be 0 or greater"),
+  qualifications: z.array(z.string()).min(1, "At least one qualification is required"),
+  linkedinProfile: z.string().url().optional(),
+  personalWebsite: z.string().url().optional()
+});
+var instructorProfileUpdateSchema = createInsertSchema(users).pick({
+  name: true,
+  bio: true,
+  expertiseAreas: true,
+  teachingExperience: true,
+  linkedinProfile: true,
+  personalWebsite: true,
+  qualifications: true,
+  imageUrl: true
+});
+var createInstructorInviteSchema = createInsertSchema(instructorInvites).pick({
+  email: true
+});
+var validateInstructorInviteSchema = z.object({
+  token: z.string().min(1, "Token is required")
 });
 var insertCourseSchema = createInsertSchema(courses).omit({
   id: true,
@@ -751,9 +1554,6 @@ var insertNotificationSchema = createInsertSchema(notifications).omit({
 });
 
 // server/db.ts
-import { Pool, neonConfig } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-serverless";
-import ws from "ws";
 neonConfig.webSocketConstructor = ws;
 if (!process.env.DATABASE_URL) {
   throw new Error(
@@ -763,2333 +1563,11 @@ if (!process.env.DATABASE_URL) {
 var pool = new Pool({ connectionString: process.env.DATABASE_URL });
 var db = drizzle({ client: pool, schema: schema_exports });
 
-// server/storage.ts
-import { eq, desc, asc, and, or, like, sql } from "drizzle-orm";
-var DatabaseStorage = class {
-  // User management
-  async getUser(id) {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user || void 0;
-  }
-  async getUserByUsername(username) {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user || void 0;
-  }
-  async getUserByEmail(email) {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
-    return user || void 0;
-  }
-  async createUser(insertUser) {
-    const [user] = await db.insert(users).values(insertUser).returning();
-    return user;
-  }
-  async updateUserProfile(data) {
-    const [user] = await db.update(users).set(data).where(eq(users.id, data.id)).returning();
-    return user;
-  }
-  async updateUserPassword(userId, hashedPassword) {
-    await db.update(users).set({ password: hashedPassword }).where(eq(users.id, userId));
-  }
-  async updateUserActivity(userId) {
-    await db.update(userStats).set({ lastActivityDate: /* @__PURE__ */ new Date() }).where(eq(userStats.userId, userId));
-  }
-  // User stats and gamification
-  async getUserStats(userId) {
-    const [stats] = await db.select().from(userStats).where(eq(userStats.userId, userId));
-    return stats || void 0;
-  }
-  async createUserStats(stats) {
-    const [newStats] = await db.insert(userStats).values(stats).returning();
-    return newStats;
-  }
-  async updateUserStats(userId, updates) {
-    const [stats] = await db.update(userStats).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq(userStats.userId, userId)).returning();
-    return stats;
-  }
-  async addXP(userId, amount, reason, sourceType, sourceId) {
-    await db.insert(xpTransactions).values({
-      userId,
-      amount,
-      reason,
-      sourceType,
-      sourceId
-    });
-    await db.update(userStats).set({
-      totalXP: sql`${userStats.totalXP} + ${amount}`,
-      updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq(userStats.userId, userId));
-  }
-  async getUserAchievements(userId) {
-    const userAchievementsList = await db.select({ achievement: achievements }).from(userAchievements).innerJoin(achievements, eq(userAchievements.achievementId, achievements.id)).where(eq(userAchievements.userId, userId)).orderBy(desc(userAchievements.earnedAt));
-    return userAchievementsList.map((ua) => ua.achievement);
-  }
-  async unlockAchievement(userId, achievementId) {
-    await db.insert(userAchievements).values({
-      userId,
-      achievementId
-    });
-  }
-  // Course management
-  async getCourse(id) {
-    const [course] = await db.select().from(courses).where(eq(courses.id, id));
-    return course || void 0;
-  }
-  async getCourses(filters = {}) {
-    let query = db.select().from(courses);
-    if (filters.domain) {
-      query = query.where(eq(courses.domain, filters.domain));
-    }
-    if (filters.level) {
-      query = query.where(eq(courses.level, filters.level));
-    }
-    if (filters.search) {
-      query = query.where(
-        or(
-          like(courses.title, `%${filters.search}%`),
-          like(courses.description, `%${filters.search}%`)
-        )
-      );
-    }
-    return await query.orderBy(desc(courses.createdAt));
-  }
-  async createCourse(course) {
-    const [newCourse] = await db.insert(courses).values(course).returning();
-    return newCourse;
-  }
-  async updateCourse(id, updates) {
-    const [course] = await db.update(courses).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq(courses.id, id)).returning();
-    return course;
-  }
-  async deleteCourse(id) {
-    await db.delete(courses).where(eq(courses.id, id));
-  }
-  async getUserEnrolledCourses(userId) {
-    const enrolledCourses = await db.select({ course: courses }).from(enrollments).innerJoin(courses, eq(enrollments.courseId, courses.id)).where(eq(enrollments.userId, userId)).orderBy(desc(enrollments.enrolledAt));
-    return enrolledCourses.map((ec) => ec.course);
-  }
-  async getInstructorCourses(instructorId) {
-    return await db.select().from(courses).where(eq(courses.instructorId, instructorId)).orderBy(desc(courses.createdAt));
-  }
-  // Enrollment management
-  async enrollInCourse(userId, courseId) {
-    const [enrollment] = await db.insert(enrollments).values({ userId, courseId }).returning();
-    return enrollment;
-  }
-  async getUserEnrollment(userId, courseId) {
-    const [enrollment] = await db.select().from(enrollments).where(and(eq(enrollments.userId, userId), eq(enrollments.courseId, courseId)));
-    return enrollment || void 0;
-  }
-  async updateLessonProgress(userId, courseId, lessonId) {
-    await db.update(enrollments).set({
-      completedLessons: sql`array_append(${enrollments.completedLessons}, ${lessonId.toString()})`,
-      lastAccessedAt: /* @__PURE__ */ new Date()
-    }).where(and(eq(enrollments.userId, userId), eq(enrollments.courseId, courseId)));
-  }
-  async getCourseProgress(userId, courseId) {
-    const [enrollment] = await db.select().from(enrollments).where(and(eq(enrollments.userId, userId), eq(enrollments.courseId, courseId)));
-    return enrollment ? Number(enrollment.progress) : 0;
-  }
-  // Module and lesson management
-  async getCourseModules(courseId) {
-    return await db.select().from(modules).where(eq(modules.courseId, courseId)).orderBy(asc(modules.position));
-  }
-  async getModuleLessons(moduleId) {
-    return await db.select().from(lessons).where(eq(lessons.moduleId, moduleId)).orderBy(asc(lessons.position));
-  }
-  async createModule(module) {
-    const [newModule] = await db.insert(modules).values(module).returning();
-    return newModule;
-  }
-  async createLesson(lesson) {
-    const [newLesson] = await db.insert(lessons).values(lesson).returning();
-    return newLesson;
-  }
-  // Help center
-  async getHelpCategories() {
-    return await db.select().from(helpCategories).orderBy(asc(helpCategories.sortOrder));
-  }
-  async getHelpQuestions(categoryId, filters = {}) {
-    let query = db.select().from(helpQuestions);
-    if (categoryId) {
-      query = query.where(eq(helpQuestions.categoryId, categoryId));
-    }
-    if (filters.search) {
-      query = query.where(
-        or(
-          like(helpQuestions.title, `%${filters.search}%`),
-          like(helpQuestions.content, `%${filters.search}%`)
-        )
-      );
-    }
-    return await query.orderBy(desc(helpQuestions.createdAt));
-  }
-  async getHelpQuestion(id) {
-    const [question] = await db.select().from(helpQuestions).where(eq(helpQuestions.id, id));
-    return question || void 0;
-  }
-  async createHelpQuestion(question) {
-    const [newQuestion] = await db.insert(helpQuestions).values(question).returning();
-    return newQuestion;
-  }
-  async getQuestionAnswers(questionId) {
-    return await db.select().from(helpAnswers).where(eq(helpAnswers.questionId, questionId)).orderBy(desc(helpAnswers.createdAt));
-  }
-  async createHelpAnswer(answer) {
-    const [newAnswer] = await db.insert(helpAnswers).values(answer).returning();
-    return newAnswer;
-  }
-  async rateAnswer(answerId, userId, xpRating, starRating) {
-    if (xpRating) {
-      await db.update(helpAnswers).set({ xpRating }).where(eq(helpAnswers.id, answerId));
-    }
-    if (starRating) {
-    }
-  }
-  // Analytics
-  async recordLearningActivity(activity) {
-    await db.insert(learningAnalytics).values(activity);
-  }
-  async getUserLearningAnalytics(userId, filters = {}) {
-    let query = db.select().from(learningAnalytics).where(eq(learningAnalytics.userId, userId));
-    if (filters.startDate) {
-      query = query.where(sql`${learningAnalytics.createdAt} >= ${filters.startDate}`);
-    }
-    if (filters.endDate) {
-      query = query.where(sql`${learningAnalytics.createdAt} <= ${filters.endDate}`);
-    }
-    return await query.orderBy(desc(learningAnalytics.createdAt));
-  }
-  async getCourseLearningAnalytics(courseId, filters = {}) {
-    return await db.select().from(learningAnalytics).where(eq(learningAnalytics.courseId, courseId)).orderBy(desc(learningAnalytics.createdAt));
-  }
-  // Dashboard placeholders (to be implemented based on specific requirements)
-  async getUserRecentQuizzes(userId) {
-    return [];
-  }
-  async getUserUpcomingAssignments(userId) {
-    return [];
-  }
-  async getInstructorRecentStudents(instructorId) {
-    return [];
-  }
-  async getInstructorPendingAssignments(instructorId) {
-    return [];
-  }
-  // Leaderboards
-  async getLeaderboard(category, limit = 10) {
-    return [];
-  }
-  async updateLeaderboard(userId, category, xp) {
-  }
-};
-var storage = new DatabaseStorage();
-
-// server/utils/helpers.ts
-import bcrypt from "bcryptjs";
-var hashPassword = async (password) => {
-  const saltRounds = 12;
-  return await bcrypt.hash(password, saltRounds);
-};
-var comparePassword = async (password, hash) => {
-  return await bcrypt.compare(password, hash);
-};
-var getStartOfWeek = (date = /* @__PURE__ */ new Date()) => {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day;
-  return new Date(d.setDate(diff));
-};
-var getEndOfWeek = (date = /* @__PURE__ */ new Date()) => {
-  const d = getStartOfWeek(date);
-  return new Date(d.setDate(d.getDate() + 6));
-};
-var getStartOfMonth = (date = /* @__PURE__ */ new Date()) => {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-};
-var getEndOfMonth = (date = /* @__PURE__ */ new Date()) => {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
-};
-var createPaginationResult = (data, totalItems, options) => {
-  const totalPages = Math.ceil(totalItems / options.limit);
-  return {
-    data,
-    pagination: {
-      currentPage: options.page,
-      totalPages,
-      totalItems,
-      itemsPerPage: options.limit,
-      hasNextPage: options.page < totalPages,
-      hasPrevPage: options.page > 1
-    }
-  };
-};
-var calculateLevelFromXP = (xp) => {
-  return Math.floor(Math.sqrt(xp / 100)) + 1;
-};
-var calculateXPForLevel = (level) => {
-  return Math.pow(level - 1, 2) * 100;
-};
-var calculateXPToNextLevel = (currentXP) => {
-  const currentLevel = calculateLevelFromXP(currentXP);
-  const nextLevelXP = calculateXPForLevel(currentLevel + 1);
-  return nextLevelXP - currentXP;
-};
-var calculateLearningStreak = (lastActivityDate) => {
-  if (!lastActivityDate) return 0;
-  const today = /* @__PURE__ */ new Date();
-  const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1e3);
-  const lastActivity = new Date(lastActivityDate);
-  today.setHours(0, 0, 0, 0);
-  yesterday.setHours(0, 0, 0, 0);
-  lastActivity.setHours(0, 0, 0, 0);
-  if (lastActivity.getTime() === today.getTime() || lastActivity.getTime() === yesterday.getTime()) {
-    return 1;
-  }
-  return 0;
-};
-
-// server/middleware/auth.ts
-import jwt from "jsonwebtoken";
-var authenticate = async (req, res, next) => {
-  try {
-    const token = req.header("Authorization")?.replace("Bearer ", "");
-    if (!token) {
-      return res.status(401).json({ error: "No token provided" });
-    }
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await storage.getUser(decoded.userId);
-    if (!user) {
-      return res.status(401).json({ error: "Invalid token" });
-    }
-    req.user = {
-      id: user.id,
-      username: user.username,
-      role: user.role
-    };
-    next();
-  } catch (error) {
-    res.status(401).json({ error: "Invalid token" });
-  }
-};
-var authorize = (roles) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ error: "Insufficient permissions" });
-    }
-    next();
-  };
-};
-var generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: "7d" });
-};
-var refreshToken = async (req, res) => {
-  try {
-    const token = req.header("Authorization")?.replace("Bearer ", "");
-    if (!token) {
-      return res.status(401).json({ error: "No token provided" });
-    }
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await storage.getUser(decoded.userId);
-    if (!user) {
-      return res.status(401).json({ error: "Invalid token" });
-    }
-    const newToken = generateToken(user.id);
-    res.json({ token: newToken });
-  } catch (error) {
-    res.status(401).json({ error: "Invalid token" });
-  }
-};
-
-// server/utils/logger.ts
-import winston from "winston";
-import fs from "fs";
-import path from "path";
-var logFormat = winston.format.combine(
-  winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
-  winston.format.errors({ stack: true }),
-  winston.format.printf(({ timestamp: timestamp2, level, message, stack }) => {
-    return `${timestamp2} [${level.toUpperCase()}]: ${stack || message}`;
-  })
-);
-var logger = winston.createLogger({
-  level: process.env.NODE_ENV === "production" ? "info" : "debug",
-  format: logFormat,
-  defaultMeta: { service: "lms-backend" },
-  transports: [
-    // Console transport for development
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        logFormat
-      )
-    }),
-    // File transport for errors
-    new winston.transports.File({
-      filename: "logs/error.log",
-      level: "error",
-      maxsize: 5242880,
-      // 5MB
-      maxFiles: 5
-    }),
-    // File transport for all logs
-    new winston.transports.File({
-      filename: "logs/combined.log",
-      maxsize: 5242880,
-      // 5MB
-      maxFiles: 5
-    })
-  ],
-  // Handle exceptions and rejections
-  exceptionHandlers: [
-    new winston.transports.File({ filename: "logs/exceptions.log" })
-  ],
-  rejectionHandlers: [
-    new winston.transports.File({ filename: "logs/rejections.log" })
-  ]
-});
-var apiLogger = (req, res, next) => {
-  const start = Date.now();
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    const logData = {
-      method: req.method,
-      url: req.originalUrl,
-      statusCode: res.statusCode,
-      duration: `${duration}ms`,
-      userAgent: req.get("User-Agent"),
-      ip: req.ip,
-      userId: req.user?.id || "anonymous"
-    };
-    if (res.statusCode >= 400) {
-      logger.error("API Error", logData);
-    } else {
-      logger.info("API Request", logData);
-    }
-  });
-  next();
-};
-var securityLogger = {
-  authFailure: (username, ip, reason) => {
-    logger.warn("Authentication Failure", {
-      username,
-      ip,
-      reason,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  },
-  authSuccess: (userId, username, ip) => {
-    logger.info("Authentication Success", {
-      userId,
-      username,
-      ip,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  },
-  rateLimitExceeded: (ip, endpoint) => {
-    logger.warn("Rate Limit Exceeded", {
-      ip,
-      endpoint,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  },
-  suspiciousActivity: (userId, activity, metadata) => {
-    logger.warn("Suspicious Activity", {
-      userId,
-      activity,
-      metadata,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  }
-};
-var metricsLogger = {
-  courseEnrollment: (userId, courseId, price) => {
-    logger.info("Course Enrollment", {
-      userId,
-      courseId,
-      price,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  },
-  courseCompletion: (userId, courseId, completionTime) => {
-    logger.info("Course Completion", {
-      userId,
-      courseId,
-      completionTime: `${completionTime}ms`,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  },
-  xpEarned: (userId, amount, source) => {
-    logger.info("XP Earned", {
-      userId,
-      amount,
-      source,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  },
-  achievementUnlocked: (userId, achievementId, achievementName) => {
-    logger.info("Achievement Unlocked", {
-      userId,
-      achievementId,
-      achievementName,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  }
-};
-var logsDir = path.join(process.cwd(), "logs");
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true });
-}
-
-// server/middleware/errorHandler.ts
-var AppError = class extends Error {
-  statusCode;
-  isOperational;
-  constructor(message, statusCode = 500, isOperational = true) {
-    super(message);
-    this.statusCode = statusCode;
-    this.isOperational = isOperational;
-    Error.captureStackTrace(this, this.constructor);
-  }
-};
-var asyncHandler = (fn) => {
-  return (req, res, next) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
-  };
-};
-var errorHandler = (err, req, res, next) => {
-  let error = { ...err };
-  error.message = err.message;
-  logger.error(err);
-  if (err.name === "CastError") {
-    const message2 = "Resource not found";
-    error = new AppError(message2, 404);
-  }
-  if (err.name === "MongoError" && err.code === 11e3) {
-    const message2 = "Duplicate field value entered";
-    error = new AppError(message2, 400);
-  }
-  if (err.name === "ValidationError") {
-    const message2 = Object.values(err.errors).map((val) => val.message);
-    error = new AppError(message2.join(", "), 400);
-  }
-  if (err.name === "JsonWebTokenError") {
-    const message2 = "Invalid token";
-    error = new AppError(message2, 401);
-  }
-  if (err.name === "TokenExpiredError") {
-    const message2 = "Token expired";
-    error = new AppError(message2, 401);
-  }
-  if (err.message?.includes("connect ECONNREFUSED")) {
-    const message2 = "Database connection failed";
-    error = new AppError(message2, 503);
-  }
-  if (err.message?.includes("DeepSeek") || err.message?.includes("OpenAI")) {
-    const message2 = "AI service temporarily unavailable";
-    error = new AppError(message2, 503);
-  }
-  if (err.message?.includes("File too large")) {
-    const message2 = "File size exceeds limit";
-    error = new AppError(message2, 413);
-  }
-  if (err.message?.includes("Too many requests")) {
-    error = new AppError(err.message, 429);
-  }
-  const statusCode = error.statusCode || 500;
-  const message = error.message || "Internal Server Error";
-  const errorResponse = {
-    success: false,
-    error: message,
-    ...process.env.NODE_ENV === "development" && {
-      stack: err.stack,
-      details: error
-    }
-  };
-  res.status(statusCode).json(errorResponse);
-};
-var notFound = (req, res, next) => {
-  const error = new AppError(`Route ${req.originalUrl} not found`, 404);
-  next(error);
-};
-var createValidationError = (message) => {
-  return new AppError(message, 400);
-};
-var createAuthError = (message = "Authentication failed") => {
-  return new AppError(message, 401);
-};
-var createForbiddenError = (message = "Access forbidden") => {
-  return new AppError(message, 403);
-};
-var createNotFoundError = (resource = "Resource") => {
-  return new AppError(`${resource} not found`, 404);
-};
-var createConflictError = (message) => {
-  return new AppError(message, 409);
-};
-
-// server/controllers/authController.ts
-var AuthController = class {
-  // User registration
-  static async register(req, res) {
-    try {
-      const userData = insertUserSchema.parse(req.body);
-      const existingUser = await storage.getUserByUsername(userData.username);
-      if (existingUser) {
-        throw createConflictError("Username already exists");
-      }
-      const existingEmail = await storage.getUserByEmail?.(userData.email);
-      if (existingEmail) {
-        throw createConflictError("Email already exists");
-      }
-      const hashedPassword = await hashPassword(userData.password);
-      const newUser = await storage.createUser({
-        ...userData,
-        password: hashedPassword,
-        role: userData.role || "student"
-      });
-      await storage.createUserStats?.({
-        userId: newUser.id,
-        totalXP: 0,
-        level: 1,
-        streak: 0,
-        longestStreak: 0,
-        lastActivityDate: /* @__PURE__ */ new Date(),
-        coursesCompleted: 0,
-        lessonsCompleted: 0,
-        quizzesCompleted: 0,
-        helpfulAnswers: 0
-      });
-      const token = generateToken(newUser.id);
-      securityLogger.authSuccess(newUser.id, newUser.username, req.ip);
-      res.status(201).json({
-        success: true,
-        message: "User registered successfully",
-        data: {
-          user: {
-            id: newUser.id,
-            username: newUser.username,
-            fullName: newUser.fullName,
-            email: newUser.email,
-            role: newUser.role,
-            avatar: newUser.avatar
-          },
-          token
-        }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Registration error:", error);
-      throw createValidationError("Registration failed");
-    }
-  }
-  // User login
-  static async login(req, res) {
-    try {
-      const { username, password } = req.body;
-      if (!username || !password) {
-        throw createValidationError("Username and password are required");
-      }
-      const user = await storage.getUserByUsername(username);
-      if (!user) {
-        securityLogger.authFailure(username, req.ip, "User not found");
-        throw createAuthError("Invalid credentials");
-      }
-      const isValidPassword = await comparePassword(password, user.password);
-      if (!isValidPassword) {
-        securityLogger.authFailure(username, req.ip, "Invalid password");
-        throw createAuthError("Invalid credentials");
-      }
-      await storage.updateUserActivity?.(user.id);
-      const token = generateToken(user.id);
-      securityLogger.authSuccess(user.id, user.username, req.ip);
-      res.json({
-        success: true,
-        message: "Login successful",
-        data: {
-          user: {
-            id: user.id,
-            username: user.username,
-            fullName: user.fullName,
-            email: user.email,
-            role: user.role,
-            avatar: user.avatar
-          },
-          token
-        }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Login error:", error);
-      throw createAuthError("Login failed");
-    }
-  }
-  // Get current user profile
-  static async getProfile(req, res) {
-    try {
-      const user = await storage.getUser(req.user.id);
-      if (!user) {
-        throw createAuthError("User not found");
-      }
-      const userStats2 = await storage.getUserStats?.(user.id);
-      res.json({
-        success: true,
-        data: {
-          user: {
-            id: user.id,
-            username: user.username,
-            fullName: user.fullName,
-            email: user.email,
-            role: user.role,
-            domain: user.domain,
-            branch: user.branch,
-            year: user.year,
-            avatar: user.avatar,
-            createdAt: user.createdAt
-          },
-          stats: userStats2
-        }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Get profile error:", error);
-      throw createAuthError("Failed to get profile");
-    }
-  }
-  // Update user profile
-  static async updateProfile(req, res) {
-    try {
-      const { fullName, email, domain, branch, year, avatar } = req.body;
-      const userId = req.user.id;
-      if (email) {
-        const existingUser = await storage.getUserByEmail?.(email);
-        if (existingUser && existingUser.id !== userId) {
-          throw createConflictError("Email already exists");
-        }
-      }
-      const updatedUser = await storage.updateUserProfile?.({
-        id: userId,
-        fullName,
-        email,
-        domain,
-        branch,
-        year,
-        avatar
-      });
-      res.json({
-        success: true,
-        message: "Profile updated successfully",
-        data: {
-          user: updatedUser
-        }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Update profile error:", error);
-      throw createValidationError("Failed to update profile");
-    }
-  }
-  // Change password
-  static async changePassword(req, res) {
-    try {
-      const { currentPassword, newPassword } = req.body;
-      const userId = req.user.id;
-      if (!currentPassword || !newPassword) {
-        throw createValidationError("Current password and new password are required");
-      }
-      const user = await storage.getUser(userId);
-      if (!user) {
-        throw createAuthError("User not found");
-      }
-      const isValidPassword = await comparePassword(currentPassword, user.password);
-      if (!isValidPassword) {
-        securityLogger.authFailure(user.username, req.ip, "Invalid current password");
-        throw createAuthError("Current password is incorrect");
-      }
-      const hashedNewPassword = await hashPassword(newPassword);
-      await storage.updateUserPassword?.(userId, hashedNewPassword);
-      securityLogger.authSuccess(userId, user.username, req.ip);
-      res.json({
-        success: true,
-        message: "Password changed successfully"
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Change password error:", error);
-      throw createValidationError("Failed to change password");
-    }
-  }
-  // Logout (optional - mainly for logging)
-  static async logout(req, res) {
-    try {
-      const userId = req.user.id;
-      logger.info(`User ${userId} logged out`, { userId, ip: req.ip });
-      res.json({
-        success: true,
-        message: "Logged out successfully"
-      });
-    } catch (error) {
-      logger.error("Logout error:", error);
-      res.json({
-        success: true,
-        message: "Logged out successfully"
-      });
-    }
-  }
-  // Refresh token
-  static async refreshToken(req, res) {
-    try {
-      const userId = req.user.id;
-      const newToken = generateToken(userId);
-      res.json({
-        success: true,
-        data: {
-          token: newToken
-        }
-      });
-    } catch (error) {
-      logger.error("Refresh token error:", error);
-      throw createAuthError("Failed to refresh token");
-    }
-  }
-  // Get user dashboard data
-  static async getDashboard(req, res) {
-    try {
-      const userId = req.user.id;
-      const userRole = req.user.role;
-      const userStats2 = await storage.getUserStats?.(userId);
-      let dashboardData = {
-        userStats: userStats2,
-        recentActivity: []
-      };
-      if (userRole === "student") {
-        const enrolledCourses = await storage.getUserEnrolledCourses?.(userId);
-        const recentQuizzes = await storage.getUserRecentQuizzes?.(userId);
-        const upcomingAssignments = await storage.getUserUpcomingAssignments?.(userId);
-        dashboardData.enrolledCourses = enrolledCourses;
-        dashboardData.recentQuizzes = recentQuizzes;
-        dashboardData.upcomingAssignments = upcomingAssignments;
-      } else if (userRole === "instructor") {
-        const createdCourses = await storage.getInstructorCourses?.(userId);
-        const recentStudents = await storage.getInstructorRecentStudents?.(userId);
-        const pendingAssignments = await storage.getInstructorPendingAssignments?.(userId);
-        dashboardData.createdCourses = createdCourses;
-        dashboardData.recentStudents = recentStudents;
-        dashboardData.pendingAssignments = pendingAssignments;
-      }
-      res.json({
-        success: true,
-        data: dashboardData
-      });
-    } catch (error) {
-      logger.error("Get dashboard error:", error);
-      throw createValidationError("Failed to get dashboard data");
-    }
-  }
-};
-
-// server/controllers/courseController.ts
-var CourseController = class {
-  // Get all courses with filtering
-  static async getCourses(req, res) {
-    try {
-      const { page = 1, limit = 12, search, domain, level, sort = "created", order = "desc" } = req.query;
-      const filters = {
-        search,
-        domain,
-        level
-      };
-      const courses2 = await storage.getCourses(filters);
-      const startIndex = (Number(page) - 1) * Number(limit);
-      const endIndex = startIndex + Number(limit);
-      const paginatedCourses = courses2.slice(startIndex, endIndex);
-      const result = createPaginationResult(
-        paginatedCourses,
-        courses2.length,
-        { page: Number(page), limit: Number(limit), sort, order }
-      );
-      res.json({
-        success: true,
-        data: result
-      });
-    } catch (error) {
-      logger.error("Get courses error:", error);
-      throw createValidationError("Failed to fetch courses");
-    }
-  }
-  // Get single course with modules and lessons
-  static async getCourse(req, res) {
-    try {
-      const courseId = parseInt(req.params.id);
-      const course = await storage.getCourse(courseId);
-      if (!course) {
-        throw createNotFoundError("Course");
-      }
-      const modules2 = await storage.getCourseModules(courseId);
-      const modulesWithLessons = await Promise.all(
-        modules2.map(async (module) => {
-          const lessons2 = await storage.getModuleLessons(module.id);
-          return { ...module, lessons: lessons2 };
-        })
-      );
-      let userEnrollment = null;
-      if (req.user) {
-        userEnrollment = await storage.getUserEnrollment(req.user.id, courseId);
-      }
-      if (req.user) {
-        await storage.recordLearningActivity({
-          userId: req.user.id,
-          courseId,
-          activityType: "lesson_view",
-          createdAt: /* @__PURE__ */ new Date()
-        });
-      }
-      res.json({
-        success: true,
-        data: {
-          course,
-          modules: modulesWithLessons,
-          userEnrollment,
-          isEnrolled: !!userEnrollment
-        }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Get course error:", error);
-      throw createValidationError("Failed to fetch course");
-    }
-  }
-  // Create new course (instructors only)
-  static async createCourse(req, res) {
-    try {
-      const courseData = insertCourseSchema.parse(req.body);
-      const instructorId = req.user.id;
-      const newCourse = await storage.createCourse({
-        ...courseData,
-        instructorId
-      });
-      logger.info(`Course created: ${newCourse.id} by instructor ${instructorId}`);
-      res.status(201).json({
-        success: true,
-        message: "Course created successfully",
-        data: { course: newCourse }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Create course error:", error);
-      throw createValidationError("Failed to create course");
-    }
-  }
-  // Update course (instructor/admin only)
-  static async updateCourse(req, res) {
-    try {
-      const courseId = parseInt(req.params.id);
-      const updates = req.body;
-      const userId = req.user.id;
-      const userRole = req.user.role;
-      const course = await storage.getCourse(courseId);
-      if (!course) {
-        throw createNotFoundError("Course");
-      }
-      if (userRole !== "admin" && course.instructorId !== userId) {
-        throw createForbiddenError("You can only update your own courses");
-      }
-      const updatedCourse = await storage.updateCourse(courseId, updates);
-      res.json({
-        success: true,
-        message: "Course updated successfully",
-        data: { course: updatedCourse }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Update course error:", error);
-      throw createValidationError("Failed to update course");
-    }
-  }
-  // Delete course (instructor/admin only)
-  static async deleteCourse(req, res) {
-    try {
-      const courseId = parseInt(req.params.id);
-      const userId = req.user.id;
-      const userRole = req.user.role;
-      const course = await storage.getCourse(courseId);
-      if (!course) {
-        throw createNotFoundError("Course");
-      }
-      if (userRole !== "admin" && course.instructorId !== userId) {
-        throw createForbiddenError("You can only delete your own courses");
-      }
-      await storage.deleteCourse(courseId);
-      res.json({
-        success: true,
-        message: "Course deleted successfully"
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Delete course error:", error);
-      throw createValidationError("Failed to delete course");
-    }
-  }
-  // Enroll in course
-  static async enrollInCourse(req, res) {
-    try {
-      const courseId = parseInt(req.params.id);
-      const userId = req.user.id;
-      const course = await storage.getCourse(courseId);
-      if (!course) {
-        throw createNotFoundError("Course");
-      }
-      const existingEnrollment = await storage.getUserEnrollment(userId, courseId);
-      if (existingEnrollment) {
-        throw createValidationError("Already enrolled in this course");
-      }
-      const enrollment = await storage.enrollInCourse(userId, courseId);
-      await storage.addXP(userId, 10, "Course enrollment", "course_enrollment", courseId);
-      metricsLogger.courseEnrollment(userId, courseId, Number(course.price));
-      res.status(201).json({
-        success: true,
-        message: "Successfully enrolled in course",
-        data: { enrollment }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Enroll in course error:", error);
-      throw createValidationError("Failed to enroll in course");
-    }
-  }
-  // Get user's enrolled courses
-  static async getUserCourses(req, res) {
-    try {
-      const userId = req.user.id;
-      const enrolledCourses = await storage.getUserEnrolledCourses(userId);
-      const coursesWithProgress = await Promise.all(
-        enrolledCourses.map(async (course) => {
-          const progress = await storage.getCourseProgress(userId, course.id);
-          return { ...course, progress };
-        })
-      );
-      res.json({
-        success: true,
-        data: { courses: coursesWithProgress }
-      });
-    } catch (error) {
-      logger.error("Get user courses error:", error);
-      throw createValidationError("Failed to fetch user courses");
-    }
-  }
-  // Get instructor's courses
-  static async getInstructorCourses(req, res) {
-    try {
-      const instructorId = req.user.id;
-      const courses2 = await storage.getInstructorCourses(instructorId);
-      res.json({
-        success: true,
-        data: { courses: courses2 }
-      });
-    } catch (error) {
-      logger.error("Get instructor courses error:", error);
-      throw createValidationError("Failed to fetch instructor courses");
-    }
-  }
-  // Add module to course
-  static async addModule(req, res) {
-    try {
-      const courseId = parseInt(req.params.courseId);
-      const moduleData = insertModuleSchema.parse(req.body);
-      const userId = req.user.id;
-      const userRole = req.user.role;
-      const course = await storage.getCourse(courseId);
-      if (!course) {
-        throw createNotFoundError("Course");
-      }
-      if (userRole !== "admin" && course.instructorId !== userId) {
-        throw createForbiddenError("You can only add modules to your own courses");
-      }
-      const newModule = await storage.createModule({
-        ...moduleData,
-        courseId
-      });
-      res.status(201).json({
-        success: true,
-        message: "Module added successfully",
-        data: { module: newModule }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Add module error:", error);
-      throw createValidationError("Failed to add module");
-    }
-  }
-  // Add lesson to module
-  static async addLesson(req, res) {
-    try {
-      const moduleId = parseInt(req.params.moduleId);
-      const lessonData = insertLessonSchema.parse(req.body);
-      const userId = req.user.id;
-      const userRole = req.user.role;
-      const modules2 = await storage.getCourseModules(0);
-      const module = modules2.find((m) => m.id === moduleId);
-      if (!module) {
-        throw createNotFoundError("Module");
-      }
-      const course = await storage.getCourse(module.courseId);
-      if (!course) {
-        throw createNotFoundError("Course");
-      }
-      if (userRole !== "admin" && course.instructorId !== userId) {
-        throw createForbiddenError("You can only add lessons to your own courses");
-      }
-      const newLesson = await storage.createLesson({
-        ...lessonData,
-        moduleId
-      });
-      res.status(201).json({
-        success: true,
-        message: "Lesson added successfully",
-        data: { lesson: newLesson }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Add lesson error:", error);
-      throw createValidationError("Failed to add lesson");
-    }
-  }
-  // Mark lesson as completed
-  static async completeLesson(req, res) {
-    try {
-      const { courseId, lessonId } = req.params;
-      const userId = req.user.id;
-      const enrollment = await storage.getUserEnrollment(userId, parseInt(courseId));
-      if (!enrollment) {
-        throw createValidationError("Not enrolled in this course");
-      }
-      await storage.updateLessonProgress(userId, parseInt(courseId), parseInt(lessonId));
-      await storage.addXP(userId, 25, "Lesson completion", "lesson_completion", parseInt(lessonId));
-      await storage.recordLearningActivity({
-        userId,
-        courseId: parseInt(courseId),
-        lessonId: parseInt(lessonId),
-        activityType: "lesson_complete",
-        createdAt: /* @__PURE__ */ new Date()
-      });
-      res.json({
-        success: true,
-        message: "Lesson marked as completed"
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Complete lesson error:", error);
-      throw createValidationError("Failed to complete lesson");
-    }
-  }
-  // Get course analytics (instructor/admin only)
-  static async getCourseAnalytics(req, res) {
-    try {
-      const courseId = parseInt(req.params.id);
-      const userId = req.user.id;
-      const userRole = req.user.role;
-      const course = await storage.getCourse(courseId);
-      if (!course) {
-        throw createNotFoundError("Course");
-      }
-      if (userRole !== "admin" && course.instructorId !== userId) {
-        throw createForbiddenError("You can only view analytics for your own courses");
-      }
-      const analytics = await storage.getCourseLearningAnalytics(courseId);
-      const analyticsData = {
-        totalViews: analytics.filter((a) => a.activityType === "lesson_view").length,
-        totalCompletions: analytics.filter((a) => a.activityType === "lesson_complete").length,
-        averageSessionTime: 0,
-        // Calculate from analytics data
-        activityByDay: {},
-        // Group by day
-        popularLessons: []
-        // Most viewed lessons
-      };
-      res.json({
-        success: true,
-        data: { analytics: analyticsData }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Get course analytics error:", error);
-      throw createValidationError("Failed to fetch course analytics");
-    }
-  }
-};
-
-// server/controllers/gamificationController.ts
-var GamificationController = class _GamificationController {
-  // Get user's gamification stats
-  static async getUserStats(req, res) {
-    try {
-      const userId = req.user.id;
-      const userStats2 = await storage.getUserStats(userId);
-      if (!userStats2) {
-        throw createNotFoundError("User stats");
-      }
-      const currentLevel = calculateLevelFromXP(userStats2.totalXP);
-      const xpToNextLevel = calculateXPToNextLevel(userStats2.totalXP);
-      const currentStreak = calculateLearningStreak(userStats2.lastActivityDate);
-      const achievements2 = await storage.getUserAchievements(userId);
-      res.json({
-        success: true,
-        data: {
-          stats: {
-            ...userStats2,
-            currentLevel,
-            xpToNextLevel,
-            currentStreak,
-            achievementCount: achievements2.length
-          },
-          achievements: achievements2
-        }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Get user stats error:", error);
-      throw createValidationError("Failed to fetch user stats");
-    }
-  }
-  // Get global leaderboard
-  static async getLeaderboard(req, res) {
-    try {
-      const { category = "overall", limit = 10, period = "all-time" } = req.query;
-      const leaderboard = await storage.getLeaderboard(
-        category,
-        parseInt(limit)
-      );
-      res.json({
-        success: true,
-        data: {
-          leaderboard,
-          category,
-          period
-        }
-      });
-    } catch (error) {
-      logger.error("Get leaderboard error:", error);
-      throw createValidationError("Failed to fetch leaderboard");
-    }
-  }
-  // Award XP manually (admin only)
-  static async awardXP(req, res) {
-    try {
-      const { userId, amount, reason } = req.body;
-      if (!userId || !amount || !reason) {
-        throw createValidationError("User ID, amount, and reason are required");
-      }
-      await storage.addXP(userId, amount, reason, "manual_award");
-      metricsLogger.xpEarned(userId, amount, reason);
-      const userStats2 = await storage.getUserStats(userId);
-      if (userStats2) {
-        const newLevel = calculateLevelFromXP(userStats2.totalXP);
-        const oldLevel = userStats2.level;
-        if (newLevel > oldLevel) {
-          await storage.updateUserStats(userId, { level: newLevel });
-          await _GamificationController.checkLevelAchievements(userId, newLevel);
-        }
-      }
-      res.json({
-        success: true,
-        message: `Awarded ${amount} XP to user ${userId}`,
-        data: { userId, amount, reason }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Award XP error:", error);
-      throw createValidationError("Failed to award XP");
-    }
-  }
-  // Update learning streak
-  static async updateLearningStreak(req, res) {
-    try {
-      const userId = req.user.id;
-      const userStats2 = await storage.getUserStats(userId);
-      if (!userStats2) {
-        throw createNotFoundError("User stats");
-      }
-      const today = /* @__PURE__ */ new Date();
-      const lastActivity = userStats2.lastActivityDate;
-      let newStreak = userStats2.streak;
-      let streakBonus = 0;
-      if (lastActivity) {
-        const daysSinceLastActivity = Math.floor(
-          (today.getTime() - lastActivity.getTime()) / (1e3 * 60 * 60 * 24)
-        );
-        if (daysSinceLastActivity === 1) {
-          newStreak = userStats2.streak + 1;
-          streakBonus = Math.min(newStreak * 2, 50);
-        } else if (daysSinceLastActivity > 1) {
-          newStreak = 1;
-        }
-      } else {
-        newStreak = 1;
-      }
-      const updates = {
-        streak: newStreak,
-        lastActivityDate: today
-      };
-      if (newStreak > userStats2.longestStreak) {
-        updates.longestStreak = newStreak;
-      }
-      await storage.updateUserStats(userId, updates);
-      if (streakBonus > 0) {
-        await storage.addXP(
-          userId,
-          streakBonus,
-          `Learning streak bonus (${newStreak} days)`,
-          "streak_bonus"
-        );
-      }
-      await _GamificationController.checkStreakAchievements(userId, newStreak);
-      res.json({
-        success: true,
-        message: "Learning streak updated",
-        data: {
-          newStreak,
-          streakBonus,
-          longestStreak: updates.longestStreak || userStats2.longestStreak
-        }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Update learning streak error:", error);
-      throw createValidationError("Failed to update learning streak");
-    }
-  }
-  // Get available achievements
-  static async getAvailableAchievements(req, res) {
-    try {
-      const achievements2 = [
-        {
-          id: 1,
-          name: "First Steps",
-          description: "Complete your first lesson",
-          icon: "\u{1F3AF}",
-          xpReward: 50,
-          category: "learning",
-          rarity: "common",
-          requirements: { lessonsCompleted: 1 }
-        },
-        {
-          id: 2,
-          name: "Knowledge Seeker",
-          description: "Complete 10 lessons",
-          icon: "\u{1F4DA}",
-          xpReward: 200,
-          category: "learning",
-          rarity: "rare",
-          requirements: { lessonsCompleted: 10 }
-        },
-        {
-          id: 3,
-          name: "Streak Master",
-          description: "Maintain a 7-day learning streak",
-          icon: "\u{1F525}",
-          xpReward: 300,
-          category: "streak",
-          rarity: "epic",
-          requirements: { streak: 7 }
-        },
-        {
-          id: 4,
-          name: "Helper",
-          description: "Get 5 helpful answer ratings",
-          icon: "\u{1F91D}",
-          xpReward: 250,
-          category: "social",
-          rarity: "rare",
-          requirements: { helpfulAnswers: 5 }
-        },
-        {
-          id: 5,
-          name: "Graduate",
-          description: "Complete your first course",
-          icon: "\u{1F393}",
-          xpReward: 500,
-          category: "milestone",
-          rarity: "epic",
-          requirements: { coursesCompleted: 1 }
-        },
-        {
-          id: 6,
-          name: "Quiz Master",
-          description: "Pass 20 quizzes",
-          icon: "\u{1F9E0}",
-          xpReward: 400,
-          category: "learning",
-          rarity: "epic",
-          requirements: { quizzesCompleted: 20 }
-        },
-        {
-          id: 7,
-          name: "Level 10",
-          description: "Reach level 10",
-          icon: "\u2B50",
-          xpReward: 1e3,
-          category: "milestone",
-          rarity: "legendary",
-          requirements: { level: 10 }
-        }
-      ];
-      res.json({
-        success: true,
-        data: { achievements: achievements2 }
-      });
-    } catch (error) {
-      logger.error("Get achievements error:", error);
-      throw createValidationError("Failed to fetch achievements");
-    }
-  }
-  // Check and unlock achievements
-  static async checkAchievements(req, res) {
-    try {
-      const userId = req.user.id;
-      const userStats2 = await storage.getUserStats(userId);
-      if (!userStats2) {
-        throw createNotFoundError("User stats");
-      }
-      const unlockedAchievements = [];
-      await _GamificationController.checkLearningAchievements(userId, userStats2, unlockedAchievements);
-      await _GamificationController.checkLevelAchievements(userId, userStats2.level, unlockedAchievements);
-      await _GamificationController.checkStreakAchievements(userId, userStats2.streak, unlockedAchievements);
-      await _GamificationController.checkSocialAchievements(userId, userStats2, unlockedAchievements);
-      res.json({
-        success: true,
-        message: `Checked achievements for user ${userId}`,
-        data: {
-          newAchievements: unlockedAchievements,
-          totalUnlocked: unlockedAchievements.length
-        }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Check achievements error:", error);
-      throw createValidationError("Failed to check achievements");
-    }
-  }
-  // Get user's XP transaction history
-  static async getXPHistory(req, res) {
-    try {
-      const userId = req.user.id;
-      const { page = 1, limit = 20 } = req.query;
-      const transactions = [
-        {
-          id: 1,
-          amount: 25,
-          reason: "Lesson completion",
-          sourceType: "lesson_completion",
-          createdAt: /* @__PURE__ */ new Date()
-        },
-        {
-          id: 2,
-          amount: 50,
-          reason: "Quiz completion",
-          sourceType: "quiz_completion",
-          createdAt: new Date(Date.now() - 864e5)
-        }
-      ];
-      res.json({
-        success: true,
-        data: {
-          transactions,
-          pagination: {
-            currentPage: Number(page),
-            totalPages: 1,
-            totalItems: transactions.length
-          }
-        }
-      });
-    } catch (error) {
-      logger.error("Get XP history error:", error);
-      throw createValidationError("Failed to fetch XP history");
-    }
-  }
-  // Helper methods for achievement checking
-  static async checkLearningAchievements(userId, userStats2, unlockedAchievements) {
-    if (userStats2.lessonsCompleted === 1) {
-      await _GamificationController.unlockAchievement(userId, 1, "First Steps", unlockedAchievements);
-    }
-    if (userStats2.lessonsCompleted === 10) {
-      await _GamificationController.unlockAchievement(userId, 2, "Knowledge Seeker", unlockedAchievements);
-    }
-    if (userStats2.quizzesCompleted === 20) {
-      await _GamificationController.unlockAchievement(userId, 6, "Quiz Master", unlockedAchievements);
-    }
-    if (userStats2.coursesCompleted === 1) {
-      await _GamificationController.unlockAchievement(userId, 5, "Graduate", unlockedAchievements);
-    }
-  }
-  static async checkLevelAchievements(userId, level, unlockedAchievements = []) {
-    if (level === 10) {
-      await _GamificationController.unlockAchievement(userId, 7, "Level 10", unlockedAchievements);
-    }
-  }
-  static async checkStreakAchievements(userId, streak, unlockedAchievements = []) {
-    if (streak === 7) {
-      await _GamificationController.unlockAchievement(userId, 3, "Streak Master", unlockedAchievements);
-    }
-  }
-  static async checkSocialAchievements(userId, userStats2, unlockedAchievements) {
-    if (userStats2.helpfulAnswers === 5) {
-      await _GamificationController.unlockAchievement(userId, 4, "Helper", unlockedAchievements);
-    }
-  }
-  static async unlockAchievement(userId, achievementId, achievementName, unlockedAchievements) {
-    try {
-      const userAchievements2 = await storage.getUserAchievements(userId);
-      const alreadyUnlocked = userAchievements2.some((a) => a.id === achievementId);
-      if (!alreadyUnlocked) {
-        await storage.unlockAchievement(userId, achievementId);
-        const xpReward = 100;
-        await storage.addXP(userId, xpReward, `Achievement unlocked: ${achievementName}`, "achievement", achievementId);
-        unlockedAchievements.push({
-          id: achievementId,
-          name: achievementName,
-          xpReward
-        });
-        metricsLogger.achievementUnlocked(userId, achievementId, achievementName);
-      }
-    } catch (error) {
-      logger.error("Unlock achievement error:", error);
-    }
-  }
-};
-
-// server/controllers/peerHelpController.ts
-var PeerHelpController = class {
-  // Get help categories
-  static async getCategories(req, res) {
-    try {
-      const categories = await storage.getHelpCategories();
-      res.json({
-        success: true,
-        data: { categories }
-      });
-    } catch (error) {
-      logger.error("Get categories error:", error);
-      throw createValidationError("Failed to fetch categories");
-    }
-  }
-  // Get questions with filtering and pagination
-  static async getQuestions(req, res) {
-    try {
-      const {
-        page = 1,
-        limit = 10,
-        categoryId,
-        search,
-        status,
-        sort = "recent",
-        tags
-      } = req.query;
-      const filters = {
-        search,
-        status,
-        tags
-      };
-      const questions = await storage.getHelpQuestions(
-        categoryId ? parseInt(categoryId) : void 0,
-        filters
-      );
-      const startIndex = (Number(page) - 1) * Number(limit);
-      const endIndex = startIndex + Number(limit);
-      const paginatedQuestions = questions.slice(startIndex, endIndex);
-      const result = createPaginationResult(
-        paginatedQuestions,
-        questions.length,
-        { page: Number(page), limit: Number(limit), sort }
-      );
-      res.json({
-        success: true,
-        data: result
-      });
-    } catch (error) {
-      logger.error("Get questions error:", error);
-      throw createValidationError("Failed to fetch questions");
-    }
-  }
-  // Get single question with answers
-  static async getQuestion(req, res) {
-    try {
-      const questionId = parseInt(req.params.id);
-      const question = await storage.getHelpQuestion(questionId);
-      if (!question) {
-        throw createNotFoundError("Question");
-      }
-      const answers = await storage.getQuestionAnswers(questionId);
-      res.json({
-        success: true,
-        data: {
-          question,
-          answers,
-          answerCount: answers.length
-        }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Get question error:", error);
-      throw createValidationError("Failed to fetch question");
-    }
-  }
-  // Create new question
-  static async createQuestion(req, res) {
-    try {
-      const questionData = insertHelpQuestionSchema.parse(req.body);
-      const userId = req.user.id;
-      const newQuestion = await storage.createHelpQuestion({
-        ...questionData,
-        userId
-      });
-      await storage.addXP(userId, 5, "Asked a question", "help_question", newQuestion.id);
-      logger.info(`Question created: ${newQuestion.id} by user ${userId}`);
-      res.status(201).json({
-        success: true,
-        message: "Question created successfully",
-        data: { question: newQuestion }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Create question error:", error);
-      throw createValidationError("Failed to create question");
-    }
-  }
-  // Create answer to question
-  static async createAnswer(req, res) {
-    try {
-      const questionId = parseInt(req.params.questionId);
-      const answerData = insertHelpAnswerSchema.parse(req.body);
-      const userId = req.user.id;
-      const question = await storage.getHelpQuestion(questionId);
-      if (!question) {
-        throw createNotFoundError("Question");
-      }
-      const newAnswer = await storage.createHelpAnswer({
-        ...answerData,
-        questionId,
-        userId
-      });
-      await storage.addXP(userId, 15, "Answered a question", "help_answer", newAnswer.id);
-      logger.info(`Answer created: ${newAnswer.id} for question ${questionId} by user ${userId}`);
-      res.status(201).json({
-        success: true,
-        message: "Answer created successfully",
-        data: { answer: newAnswer }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Create answer error:", error);
-      throw createValidationError("Failed to create answer");
-    }
-  }
-  // Rate an answer (XP rating by question author or star rating by community)
-  static async rateAnswer(req, res) {
-    try {
-      const answerId = parseInt(req.params.answerId);
-      const { xpRating, starRating } = req.body;
-      const userId = req.user.id;
-      const answers = await storage.getQuestionAnswers(0);
-      const answer = answers.find((a) => a.id === answerId);
-      if (!answer) {
-        throw createNotFoundError("Answer");
-      }
-      const question = await storage.getHelpQuestion(answer.questionId);
-      if (!question) {
-        throw createNotFoundError("Question");
-      }
-      if (xpRating !== void 0) {
-        if (question.userId !== userId) {
-          throw createForbiddenError("Only the question author can give XP ratings");
-        }
-        if (xpRating < 1 || xpRating > 10) {
-          throw createValidationError("XP rating must be between 1 and 10");
-        }
-        const xpAward = xpRating * 10;
-        await storage.addXP(
-          answer.userId,
-          xpAward,
-          `Helpful answer rating: ${xpRating}/10`,
-          "helpful_answer",
-          answerId
-        );
-        await storage.updateUserStats(answer.userId, {
-          helpfulAnswers: 1
-          // This should increment, not set
-        });
-        metricsLogger.xpEarned(answer.userId, xpAward, "helpful_answer_rating");
-      }
-      if (starRating !== void 0) {
-        if (answer.userId === userId) {
-          throw createForbiddenError("You cannot rate your own answer");
-        }
-        if (starRating < 1 || starRating > 5) {
-          throw createValidationError("Star rating must be between 1 and 5");
-        }
-      }
-      await storage.rateAnswer(answerId, userId, xpRating, starRating);
-      res.json({
-        success: true,
-        message: "Answer rated successfully",
-        data: {
-          answerId,
-          xpRating,
-          starRating,
-          xpAwarded: xpRating ? xpRating * 10 : 0
-        }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Rate answer error:", error);
-      throw createValidationError("Failed to rate answer");
-    }
-  }
-  // Get leaderboard for peer help
-  static async getHelpLeaderboard(req, res) {
-    try {
-      const { period = "monthly", limit = 10 } = req.query;
-      const leaderboard = [
-        {
-          rank: 1,
-          userId: 1,
-          username: "helpmaster",
-          fullName: "Help Master",
-          avatar: null,
-          helpfulAnswers: 45,
-          totalXPFromHelp: 1250,
-          level: 8
-        },
-        {
-          rank: 2,
-          userId: 2,
-          username: "codeguru",
-          fullName: "Code Guru",
-          avatar: null,
-          helpfulAnswers: 38,
-          totalXPFromHelp: 980,
-          level: 7
-        }
-      ];
-      res.json({
-        success: true,
-        data: {
-          leaderboard,
-          period,
-          lastUpdated: /* @__PURE__ */ new Date()
-        }
-      });
-    } catch (error) {
-      logger.error("Get help leaderboard error:", error);
-      throw createValidationError("Failed to fetch help leaderboard");
-    }
-  }
-  // Get user's help statistics
-  static async getUserHelpStats(req, res) {
-    try {
-      const userId = req.user.id;
-      const stats = {
-        questionsAsked: 12,
-        answersGiven: 28,
-        helpfulAnswers: 15,
-        averageXPRating: 7.2,
-        averageStarRating: 4.1,
-        totalXPFromHelp: 420,
-        rank: 5,
-        badges: [
-          { name: "First Answer", icon: "\u{1F31F}", earnedAt: "2024-01-15" },
-          { name: "Helpful Helper", icon: "\u{1F91D}", earnedAt: "2024-02-20" }
-        ]
-      };
-      res.json({
-        success: true,
-        data: { stats }
-      });
-    } catch (error) {
-      logger.error("Get user help stats error:", error);
-      throw createValidationError("Failed to fetch user help stats");
-    }
-  }
-  // Vote on question (upvote/downvote)
-  static async voteOnQuestion(req, res) {
-    try {
-      const questionId = parseInt(req.params.questionId);
-      const { voteType } = req.body;
-      const userId = req.user.id;
-      if (!["up", "down"].includes(voteType)) {
-        throw createValidationError('Vote type must be "up" or "down"');
-      }
-      const question = await storage.getHelpQuestion(questionId);
-      if (!question) {
-        throw createNotFoundError("Question");
-      }
-      if (question.userId === userId) {
-        throw createForbiddenError("You cannot vote on your own question");
-      }
-      res.json({
-        success: true,
-        message: "Vote recorded successfully",
-        data: {
-          questionId,
-          voteType,
-          newUpvotes: question.upvotes + (voteType === "up" ? 1 : 0),
-          newDownvotes: question.downvotes + (voteType === "down" ? 1 : 0)
-        }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Vote on question error:", error);
-      throw createValidationError("Failed to record vote");
-    }
-  }
-  // Vote on answer (upvote/downvote)
-  static async voteOnAnswer(req, res) {
-    try {
-      const answerId = parseInt(req.params.answerId);
-      const { voteType } = req.body;
-      const userId = req.user.id;
-      if (!["up", "down"].includes(voteType)) {
-        throw createValidationError('Vote type must be "up" or "down"');
-      }
-      const answers = await storage.getQuestionAnswers(0);
-      const answer = answers.find((a) => a.id === answerId);
-      if (!answer) {
-        throw createNotFoundError("Answer");
-      }
-      if (answer.userId === userId) {
-        throw createForbiddenError("You cannot vote on your own answer");
-      }
-      res.json({
-        success: true,
-        message: "Vote recorded successfully",
-        data: {
-          answerId,
-          voteType,
-          newUpvotes: answer.upvotes + (voteType === "up" ? 1 : 0),
-          newDownvotes: answer.downvotes + (voteType === "down" ? 1 : 0)
-        }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Vote on answer error:", error);
-      throw createValidationError("Failed to record vote");
-    }
-  }
-  // Mark answer as accepted (question author only)
-  static async acceptAnswer(req, res) {
-    try {
-      const answerId = parseInt(req.params.answerId);
-      const userId = req.user.id;
-      const answers = await storage.getQuestionAnswers(0);
-      const answer = answers.find((a) => a.id === answerId);
-      if (!answer) {
-        throw createNotFoundError("Answer");
-      }
-      const question = await storage.getHelpQuestion(answer.questionId);
-      if (!question) {
-        throw createNotFoundError("Question");
-      }
-      if (question.userId !== userId) {
-        throw createForbiddenError("Only the question author can accept answers");
-      }
-      await storage.addXP(
-        answer.userId,
-        50,
-        "Answer accepted",
-        "answer_accepted",
-        answerId
-      );
-      res.json({
-        success: true,
-        message: "Answer accepted successfully",
-        data: { answerId }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Accept answer error:", error);
-      throw createValidationError("Failed to accept answer");
-    }
-  }
-  // Search questions and answers
-  static async searchQuestions(req, res) {
-    try {
-      const { q, category, tags, page = 1, limit = 10 } = req.query;
-      if (!q || q.length < 3) {
-        throw createValidationError("Search query must be at least 3 characters");
-      }
-      const filters = {
-        search: q,
-        category,
-        tags
-      };
-      const questions = await storage.getHelpQuestions(void 0, filters);
-      const startIndex = (Number(page) - 1) * Number(limit);
-      const endIndex = startIndex + Number(limit);
-      const paginatedQuestions = questions.slice(startIndex, endIndex);
-      const result = createPaginationResult(
-        paginatedQuestions,
-        questions.length,
-        { page: Number(page), limit: Number(limit) }
-      );
-      res.json({
-        success: true,
-        data: result
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Search questions error:", error);
-      throw createValidationError("Failed to search questions");
-    }
-  }
-};
-
-// server/controllers/analyticsController.ts
-var AnalyticsController = class _AnalyticsController {
-  // Get user learning analytics
-  static async getUserAnalytics(req, res) {
-    try {
-      const userId = req.user.id;
-      const { startDate, endDate, activityType } = req.query;
-      const filters = {};
-      if (startDate) {
-        filters.startDate = new Date(startDate);
-      }
-      if (endDate) {
-        filters.endDate = new Date(endDate);
-      }
-      if (activityType) {
-        filters.activityType = activityType;
-      }
-      const analytics = await storage.getUserLearningAnalytics(userId, filters);
-      const processedData = _AnalyticsController.processUserAnalytics(analytics);
-      res.json({
-        success: true,
-        data: {
-          analytics: processedData,
-          totalActivities: analytics.length,
-          period: {
-            startDate: filters.startDate,
-            endDate: filters.endDate
-          }
-        }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Get user analytics error:", error);
-      throw createValidationError("Failed to fetch user analytics");
-    }
-  }
-  // Get course analytics (instructor/admin only)
-  static async getCourseAnalytics(req, res) {
-    try {
-      const courseId = parseInt(req.params.courseId);
-      const userId = req.user.id;
-      const userRole = req.user.role;
-      const course = await storage.getCourse(courseId);
-      if (!course) {
-        throw createNotFoundError("Course");
-      }
-      if (userRole !== "admin" && course.instructorId !== userId) {
-        throw createForbiddenError("You can only view analytics for your own courses");
-      }
-      const analytics = await storage.getCourseLearningAnalytics(courseId);
-      const processedData = _AnalyticsController.processCourseAnalytics(analytics);
-      res.json({
-        success: true,
-        data: {
-          course: {
-            id: course.id,
-            title: course.title,
-            instructorId: course.instructorId
-          },
-          analytics: processedData,
-          totalActivities: analytics.length
-        }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Get course analytics error:", error);
-      throw createValidationError("Failed to fetch course analytics");
-    }
-  }
-  // Get dashboard analytics summary
-  static async getDashboardAnalytics(req, res) {
-    try {
-      const userId = req.user.id;
-      const userRole = req.user.role;
-      const weekStart = getStartOfWeek();
-      const weekEnd = getEndOfWeek();
-      const monthStart = getStartOfMonth();
-      const monthEnd = getEndOfMonth();
-      let dashboardData = {};
-      if (userRole === "student") {
-        const weeklyAnalytics = await storage.getUserLearningAnalytics(userId, {
-          startDate: weekStart,
-          endDate: weekEnd
-        });
-        const monthlyAnalytics = await storage.getUserLearningAnalytics(userId, {
-          startDate: monthStart,
-          endDate: monthEnd
-        });
-        dashboardData = {
-          thisWeek: {
-            totalActivities: weeklyAnalytics.length,
-            lessonsViewed: weeklyAnalytics.filter((a) => a.activityType === "lesson_view").length,
-            lessonsCompleted: weeklyAnalytics.filter((a) => a.activityType === "lesson_complete").length,
-            quizAttempts: weeklyAnalytics.filter((a) => a.activityType === "quiz_attempt").length,
-            studyTime: weeklyAnalytics.reduce((sum, a) => sum + (a.duration || 0), 0)
-          },
-          thisMonth: {
-            totalActivities: monthlyAnalytics.length,
-            lessonsViewed: monthlyAnalytics.filter((a) => a.activityType === "lesson_view").length,
-            lessonsCompleted: monthlyAnalytics.filter((a) => a.activityType === "lesson_complete").length,
-            quizAttempts: monthlyAnalytics.filter((a) => a.activityType === "quiz_attempt").length,
-            studyTime: monthlyAnalytics.reduce((sum, a) => sum + (a.duration || 0), 0)
-          }
-        };
-        const userStats2 = await storage.getUserStats(userId);
-        if (userStats2) {
-          dashboardData.overall = {
-            totalXP: userStats2.totalXP,
-            level: userStats2.level,
-            streak: userStats2.streak,
-            coursesCompleted: userStats2.coursesCompleted,
-            lessonsCompleted: userStats2.lessonsCompleted,
-            quizzesCompleted: userStats2.quizzesCompleted
-          };
-        }
-      } else if (userRole === "instructor") {
-        const instructorCourses = await storage.getInstructorCourses(userId);
-        const courseIds = instructorCourses.map((c) => c.id);
-        let totalStudents = 0;
-        let totalLessonViews = 0;
-        let totalCompletions = 0;
-        for (const courseId of courseIds) {
-          const courseAnalytics = await storage.getCourseLearningAnalytics(courseId, {
-            startDate: monthStart,
-            endDate: monthEnd
-          });
-          totalLessonViews += courseAnalytics.filter((a) => a.activityType === "lesson_view").length;
-          totalCompletions += courseAnalytics.filter((a) => a.activityType === "lesson_complete").length;
-          const uniqueStudents = new Set(courseAnalytics.map((a) => a.userId)).size;
-          totalStudents += uniqueStudents;
-        }
-        dashboardData = {
-          courses: {
-            total: instructorCourses.length,
-            totalStudents,
-            thisMonth: {
-              lessonViews: totalLessonViews,
-              completions: totalCompletions,
-              engagementRate: totalLessonViews > 0 ? (totalCompletions / totalLessonViews * 100).toFixed(1) : 0
-            }
-          }
-        };
-      } else if (userRole === "admin") {
-        dashboardData = {
-          systemOverview: {
-            message: "Admin analytics would show system-wide metrics"
-          }
-        };
-      }
-      res.json({
-        success: true,
-        data: dashboardData
-      });
-    } catch (error) {
-      logger.error("Get dashboard analytics error:", error);
-      throw createValidationError("Failed to fetch dashboard analytics");
-    }
-  }
-  // Record learning activity
-  static async recordActivity(req, res) {
-    try {
-      const userId = req.user.id;
-      const {
-        courseId,
-        lessonId,
-        activityType,
-        duration,
-        progress,
-        metadata
-      } = req.body;
-      if (!activityType) {
-        throw createValidationError("Activity type is required");
-      }
-      const activity = {
-        userId,
-        courseId: courseId ? parseInt(courseId) : void 0,
-        lessonId: lessonId ? parseInt(lessonId) : void 0,
-        activityType,
-        duration: duration ? parseInt(duration) : void 0,
-        progress: progress ? parseFloat(progress) : void 0,
-        metadata: metadata || {},
-        createdAt: /* @__PURE__ */ new Date()
-      };
-      await storage.recordLearningActivity(activity);
-      await storage.updateUserActivity(userId);
-      res.json({
-        success: true,
-        message: "Activity recorded successfully",
-        data: { activity }
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Record activity error:", error);
-      throw createValidationError("Failed to record activity");
-    }
-  }
-  // Get learning progress report
-  static async getProgressReport(req, res) {
-    try {
-      const userId = req.user.id;
-      const { courseId, period = "month" } = req.query;
-      let startDate;
-      let endDate = /* @__PURE__ */ new Date();
-      switch (period) {
-        case "week":
-          startDate = getStartOfWeek();
-          break;
-        case "month":
-          startDate = getStartOfMonth();
-          break;
-        case "year":
-          startDate = new Date(endDate.getFullYear(), 0, 1);
-          break;
-        default:
-          startDate = getStartOfMonth();
-      }
-      const filters = { startDate, endDate };
-      if (courseId) {
-        filters.courseId = parseInt(courseId);
-      }
-      const analytics = await storage.getUserLearningAnalytics(userId, filters);
-      const report = _AnalyticsController.generateProgressReport(analytics, period);
-      res.json({
-        success: true,
-        data: {
-          report,
-          period,
-          dateRange: { startDate, endDate }
-        }
-      });
-    } catch (error) {
-      logger.error("Get progress report error:", error);
-      throw createValidationError("Failed to generate progress report");
-    }
-  }
-  // Get learning streaks and patterns
-  static async getLearningPatterns(req, res) {
-    try {
-      const userId = req.user.id;
-      const { days = 30 } = req.query;
-      const startDate = /* @__PURE__ */ new Date();
-      startDate.setDate(startDate.getDate() - parseInt(days));
-      const analytics = await storage.getUserLearningAnalytics(userId, {
-        startDate,
-        endDate: /* @__PURE__ */ new Date()
-      });
-      const patterns = _AnalyticsController.analyzeLearningPatterns(analytics);
-      res.json({
-        success: true,
-        data: {
-          patterns,
-          analysisRange: {
-            days: parseInt(days),
-            startDate,
-            endDate: /* @__PURE__ */ new Date()
-          }
-        }
-      });
-    } catch (error) {
-      logger.error("Get learning patterns error:", error);
-      throw createValidationError("Failed to analyze learning patterns");
-    }
-  }
-  // Helper methods for processing analytics data
-  static processUserAnalytics(analytics) {
-    const byDay = {};
-    const byActivityType = {};
-    let totalStudyTime = 0;
-    analytics.forEach((activity) => {
-      const day = activity.createdAt.toISOString().split("T")[0];
-      if (!byDay[day]) {
-        byDay[day] = {
-          date: day,
-          activities: 0,
-          studyTime: 0,
-          lessonsViewed: 0,
-          lessonsCompleted: 0,
-          quizAttempts: 0
-        };
-      }
-      byDay[day].activities++;
-      if (activity.duration) {
-        byDay[day].studyTime += activity.duration;
-        totalStudyTime += activity.duration;
-      }
-      if (activity.activityType === "lesson_view") {
-        byDay[day].lessonsViewed++;
-      } else if (activity.activityType === "lesson_complete") {
-        byDay[day].lessonsCompleted++;
-      } else if (activity.activityType === "quiz_attempt") {
-        byDay[day].quizAttempts++;
-      }
-      byActivityType[activity.activityType] = (byActivityType[activity.activityType] || 0) + 1;
-    });
-    return {
-      dailyActivity: Object.values(byDay),
-      activityBreakdown: byActivityType,
-      totalStudyTime,
-      averageDailyActivity: analytics.length / Object.keys(byDay).length || 0
-    };
-  }
-  static processCourseAnalytics(analytics) {
-    const uniqueUsers = new Set(analytics.map((a) => a.userId)).size;
-    const totalViews = analytics.filter((a) => a.activityType === "lesson_view").length;
-    const totalCompletions = analytics.filter((a) => a.activityType === "lesson_complete").length;
-    const engagementRate = totalViews > 0 ? totalCompletions / totalViews * 100 : 0;
-    const userActivity = {};
-    analytics.forEach((activity) => {
-      if (!userActivity[activity.userId]) {
-        userActivity[activity.userId] = {
-          userId: activity.userId,
-          views: 0,
-          completions: 0,
-          lastActivity: activity.createdAt
-        };
-      }
-      if (activity.activityType === "lesson_view") {
-        userActivity[activity.userId].views++;
-      } else if (activity.activityType === "lesson_complete") {
-        userActivity[activity.userId].completions++;
-      }
-      if (activity.createdAt > userActivity[activity.userId].lastActivity) {
-        userActivity[activity.userId].lastActivity = activity.createdAt;
-      }
-    });
-    return {
-      overview: {
-        uniqueUsers,
-        totalViews,
-        totalCompletions,
-        engagementRate: engagementRate.toFixed(1)
-      },
-      userActivity: Object.values(userActivity)
-    };
-  }
-  static generateProgressReport(analytics, period) {
-    const totalActivities = analytics.length;
-    const lessonsCompleted = analytics.filter((a) => a.activityType === "lesson_complete").length;
-    const quizAttempts2 = analytics.filter((a) => a.activityType === "quiz_attempt").length;
-    const totalStudyTime = analytics.reduce((sum, a) => sum + (a.duration || 0), 0);
-    return {
-      summary: {
-        totalActivities,
-        lessonsCompleted,
-        quizAttempts: quizAttempts2,
-        totalStudyTime,
-        averageStudyTime: totalStudyTime / Math.max(totalActivities, 1)
-      },
-      goals: {
-        lessonsTarget: period === "week" ? 5 : period === "month" ? 20 : 100,
-        lessonsProgress: lessonsCompleted,
-        completionRate: period === "week" ? lessonsCompleted / 5 * 100 : period === "month" ? lessonsCompleted / 20 * 100 : lessonsCompleted / 100 * 100
-      }
-    };
-  }
-  static analyzeLearningPatterns(analytics) {
-    const hourlyActivity = {};
-    const dailyActivity = {};
-    analytics.forEach((activity) => {
-      const hour = activity.createdAt.getHours();
-      const dayOfWeek = activity.createdAt.getDay();
-      const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      hourlyActivity[hour] = (hourlyActivity[hour] || 0) + 1;
-      dailyActivity[dayNames[dayOfWeek]] = (dailyActivity[dayNames[dayOfWeek]] || 0) + 1;
-    });
-    const peakHour = Object.entries(hourlyActivity).reduce(
-      (a, b) => hourlyActivity[parseInt(a[0])] > hourlyActivity[parseInt(b[0])] ? a : b,
-      ["0", 0]
-    );
-    const peakDay = Object.entries(dailyActivity).reduce(
-      (a, b) => a[1] > b[1] ? a : b,
-      ["Monday", 0]
-    );
-    return {
-      hourlyActivity,
-      dailyActivity,
-      peakLearningHour: parseInt(peakHour[0]),
-      peakLearningDay: peakDay[0],
-      totalSessions: analytics.length,
-      averageSessionLength: analytics.reduce((sum, a) => sum + (a.duration || 0), 0) / analytics.length || 0
-    };
-  }
-};
-
 // server/controllers/aiController.ts
-import { eq as eq2, and as and2, sql as sql2 } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 // server/services/aiService.ts
+init_logger();
 var AIService = class {
   static API_BASE_URL = "https://api.deepseek.com/v1";
   static API_KEY = process.env.DEEPSEEK_API_KEY;
@@ -3408,354 +1886,10 @@ Suggest 3 helpful study tips or questions:` }
 };
 
 // server/controllers/aiController.ts
-var analyzeAnswer = async (req, res) => {
-  try {
-    const { answerId } = req.params;
-    const answer = await db.select().from(helpAnswers).where(eq2(helpAnswers.id, parseInt(answerId))).limit(1);
-    if (!answer.length) {
-      return res.status(404).json({ error: "Answer not found" });
-    }
-    const aiService = new AIService();
-    const analysis = await aiService.analyzeAnswer(answer[0].content);
-    const aiScore = await db.insert(aiScores).values({
-      answerId: parseInt(answerId),
-      aiScore: analysis.overallScore.toString(),
-      summaryComment: analysis.summary,
-      grammarScore: analysis.grammarScore.toString(),
-      clarityScore: analysis.clarityScore.toString(),
-      correctnessScore: analysis.correctnessScore.toString()
-    }).returning();
-    await db.insert(notifications).values({
-      userId: answer[0].userId,
-      title: "AI Analysis Complete",
-      message: `Your answer received an AI quality score of ${analysis.overallScore}/10`,
-      type: "answer_received",
-      relatedId: parseInt(answerId),
-      relatedType: "answer"
-    });
-    logger.info(`AI analysis completed for answer ${answerId}`, { analysis });
-    res.json({ analysis: aiScore[0], insights: analysis });
-  } catch (error) {
-    logger.error("Error analyzing answer:", error);
-    res.status(500).json({ error: "Failed to analyze answer" });
-  }
-};
-var getSkillAnalytics = async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const skills = await db.select().from(skillProgress).where(eq2(skillProgress.userId, parseInt(userId)));
-    const totalXP = skills.reduce((sum, skill) => sum + (skill.totalXP || 0), 0);
-    const skillDistribution = skills.map((skill) => ({
-      ...skill,
-      percentage: totalXP > 0 ? (skill.totalXP || 0) / totalXP * 100 : 0
-    }));
-    const weeklyGrowth = await db.execute(sql2`
-      SELECT skill_tag, DATE_TRUNC('week', last_updated) as week, SUM(total_xp) as weekly_xp
-      FROM skill_progress
-      WHERE user_id = ${parseInt(userId)}
-      AND last_updated >= NOW() - INTERVAL '8 weeks'
-      GROUP BY skill_tag, week
-      ORDER BY week DESC
-    `);
-    res.json({
-      skillDistribution,
-      weeklyGrowth: weeklyGrowth.rows,
-      topSkills: skills.sort((a, b) => (b.totalXP || 0) - (a.totalXP || 0)).slice(0, 5),
-      totalSkills: skills.length,
-      totalXP
-    });
-  } catch (error) {
-    logger.error("Error fetching skill analytics:", error);
-    res.status(500).json({ error: "Failed to fetch skill analytics" });
-  }
-};
-var updateSkillProgress = async (req, res) => {
-  try {
-    const { userId, skillTag, xpGained, questionAnswered } = req.body;
-    const existing = await db.select().from(skillProgress).where(and2(eq2(skillProgress.userId, userId), eq2(skillProgress.skillTag, skillTag))).limit(1);
-    if (existing.length > 0) {
-      await db.update(skillProgress).set({
-        totalXP: sql2`total_xp + ${xpGained}`,
-        questionsAnswered: sql2`questions_answered + ${questionAnswered ? 1 : 0}`,
-        lastUpdated: /* @__PURE__ */ new Date()
-      }).where(and2(eq2(skillProgress.userId, userId), eq2(skillProgress.skillTag, skillTag)));
-    } else {
-      await db.insert(skillProgress).values({
-        userId,
-        skillTag,
-        totalXP: xpGained,
-        questionsAnswered: questionAnswered ? 1 : 0
-      });
-    }
-    logger.info(`Skill progress updated for user ${userId}, skill ${skillTag}`, { xpGained, questionAnswered });
-    res.json({ success: true });
-  } catch (error) {
-    logger.error("Error updating skill progress:", error);
-    res.status(500).json({ error: "Failed to update skill progress" });
-  }
-};
-var createMission = async (req, res) => {
-  try {
-    const { title, description, xpReward, skillTag, missionType, requirements, validUntil } = req.body;
-    const mission = await db.insert(missions).values({
-      title,
-      description,
-      xpReward,
-      skillTag,
-      missionType,
-      requirements,
-      validUntil: validUntil ? new Date(validUntil) : void 0
-    }).returning();
-    logger.info(`Mission created: ${title}`, { missionId: mission[0].id });
-    res.json(mission[0]);
-  } catch (error) {
-    logger.error("Error creating mission:", error);
-    res.status(500).json({ error: "Failed to create mission" });
-  }
-};
-var getUserMissions = async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const userMissionsQuery = await db.execute(sql2`
-      SELECT 
-        m.*,
-        mp.current_progress,
-        mp.is_completed,
-        mp.xp_claimed,
-        mp.completed_at
-      FROM missions m
-      LEFT JOIN mission_progress mp ON m.id = mp.mission_id AND mp.user_id = ${parseInt(userId)}
-      WHERE m.is_active = true 
-      AND (m.valid_until IS NULL OR m.valid_until > NOW())
-      ORDER BY m.created_at DESC
-    `);
-    res.json(userMissionsQuery.rows);
-  } catch (error) {
-    logger.error("Error fetching user missions:", error);
-    res.status(500).json({ error: "Failed to fetch missions" });
-  }
-};
-var updateMissionProgress = async (req, res) => {
-  try {
-    const { userId, missionId, progressIncrement } = req.body;
-    const mission = await db.select().from(missions).where(eq2(missions.id, missionId)).limit(1);
-    if (!mission.length) {
-      return res.status(404).json({ error: "Mission not found" });
-    }
-    const existing = await db.select().from(missionProgress).where(and2(eq2(missionProgress.userId, userId), eq2(missionProgress.missionId, missionId))).limit(1);
-    const targetProgress = mission[0].requirements.count;
-    let newProgress = progressIncrement;
-    let isCompleted = false;
-    if (existing.length > 0) {
-      newProgress = existing[0].currentProgress + progressIncrement;
-      isCompleted = newProgress >= targetProgress;
-      await db.update(missionProgress).set({
-        currentProgress: newProgress,
-        isCompleted,
-        completedAt: isCompleted ? /* @__PURE__ */ new Date() : void 0
-      }).where(and2(eq2(missionProgress.userId, userId), eq2(missionProgress.missionId, missionId)));
-    } else {
-      isCompleted = newProgress >= targetProgress;
-      await db.insert(missionProgress).values({
-        userId,
-        missionId,
-        currentProgress: newProgress,
-        targetProgress,
-        isCompleted,
-        completedAt: isCompleted ? /* @__PURE__ */ new Date() : void 0
-      });
-    }
-    if (isCompleted) {
-      await db.insert(notifications).values({
-        userId,
-        title: "Mission Completed!",
-        message: `You completed "${mission[0].title}" and earned ${mission[0].xpReward} XP!`,
-        type: "mission_complete",
-        relatedId: missionId,
-        relatedType: "mission"
-      });
-    }
-    logger.info(`Mission progress updated for user ${userId}, mission ${missionId}`, { newProgress, isCompleted });
-    res.json({ success: true, progress: newProgress, completed: isCompleted });
-  } catch (error) {
-    logger.error("Error updating mission progress:", error);
-    res.status(500).json({ error: "Failed to update mission progress" });
-  }
-};
-var claimMissionReward = async (req, res) => {
-  try {
-    const { userId, missionId } = req.body;
-    const progress = await db.select().from(missionProgress).where(and2(
-      eq2(missionProgress.userId, userId),
-      eq2(missionProgress.missionId, missionId),
-      eq2(missionProgress.isCompleted, true),
-      eq2(missionProgress.xpClaimed, false)
-    )).limit(1);
-    if (!progress.length) {
-      return res.status(400).json({ error: "Mission not completed or reward already claimed" });
-    }
-    const mission = await db.select().from(missions).where(eq2(missions.id, missionId)).limit(1);
-    await db.update(missionProgress).set({ xpClaimed: true }).where(and2(eq2(missionProgress.userId, userId), eq2(missionProgress.missionId, missionId)));
-    await db.update(userStats).set({ totalXP: sql2`total_xp + ${mission[0].xpReward}` }).where(eq2(userStats.userId, userId));
-    await db.insert(notifications).values({
-      userId,
-      title: "XP Reward Claimed!",
-      message: `You earned ${mission[0].xpReward} XP from mission "${mission[0].title}"`,
-      type: "xp_gained",
-      relatedId: missionId,
-      relatedType: "mission"
-    });
-    logger.info(`Mission reward claimed by user ${userId} for mission ${missionId}`, { xpReward: mission[0].xpReward });
-    res.json({ success: true, xpEarned: mission[0].xpReward });
-  } catch (error) {
-    logger.error("Error claiming mission reward:", error);
-    res.status(500).json({ error: "Failed to claim mission reward" });
-  }
-};
-var checkUnlockStatus = async (req, res) => {
-  try {
-    const { userId, unlockType } = req.params;
-    const unlock = await db.select().from(userUnlocks).where(and2(eq2(userUnlocks.userId, parseInt(userId)), eq2(userUnlocks.unlockType, unlockType))).limit(1);
-    if (unlock.length > 0) {
-      return res.json({ unlocked: true, unlockedAt: unlock[0].unlockedAt });
-    }
-    const userStatsData = await db.select().from(userStats).where(eq2(userStats.userId, parseInt(userId))).limit(1);
-    if (!userStatsData.length) {
-      return res.json({ unlocked: false, reason: "User stats not found" });
-    }
-    const stats = userStatsData[0];
-    let canUnlock = false;
-    let requirements = {};
-    switch (unlockType) {
-      case "mentor_status":
-        requirements = { xp: 1e3, answersGiven: 20, rating: 4 };
-        canUnlock = (stats.totalXP || 0) >= 1e3 && (stats.helpfulAnswers || 0) >= 20;
-        break;
-      case "premium_content":
-        requirements = { xp: 500, coursesCompleted: 3 };
-        canUnlock = (stats.totalXP || 0) >= 500 && (stats.coursesCompleted || 0) >= 3;
-        break;
-      default:
-        return res.status(400).json({ error: "Invalid unlock type" });
-    }
-    if (canUnlock) {
-      await db.insert(userUnlocks).values({
-        userId: parseInt(userId),
-        unlockType,
-        requirements: JSON.stringify(requirements)
-      });
-      await db.insert(notifications).values({
-        userId: parseInt(userId),
-        title: "New Content Unlocked!",
-        message: `You've unlocked ${unlockType.replace("_", " ")}!`,
-        type: "badge_earned",
-        relatedType: "unlock"
-      });
-      logger.info(`User ${userId} unlocked ${unlockType}`, { requirements });
-      res.json({ unlocked: true, justUnlocked: true });
-    } else {
-      res.json({
-        unlocked: false,
-        requirements,
-        currentStats: {
-          xp: stats.totalXP || 0,
-          answersGiven: stats.helpfulAnswers || 0,
-          coursesCompleted: stats.coursesCompleted || 0
-        }
-      });
-    }
-  } catch (error) {
-    logger.error("Error checking unlock status:", error);
-    res.status(500).json({ error: "Failed to check unlock status" });
-  }
-};
-var triggerAIMentor = async (req, res) => {
-  try {
-    const { questionId } = req.params;
-    const question = await db.select().from(helpQuestions).where(eq2(helpQuestions.id, parseInt(questionId))).limit(1);
-    if (!question.length) {
-      return res.status(404).json({ error: "Question not found" });
-    }
-    const questionAge = Date.now() - question[0].createdAt.getTime();
-    const twentyFourHours = 24 * 60 * 60 * 1e3;
-    let triggerReason = "manual_trigger";
-    if (questionAge > twentyFourHours) {
-      triggerReason = "24_hour_timeout";
-    }
-    const aiService = new AIService();
-    const aiResponse = await aiService.generateAnswer(question[0].title, question[0].content);
-    const mentorResponse = await db.insert(aiMentorResponses).values({
-      questionId: parseInt(questionId),
-      aiResponse: aiResponse.answer,
-      confidence: aiResponse.confidence.toString(),
-      triggerReason
-    }).returning();
-    await db.insert(helpAnswers).values({
-      questionId: parseInt(questionId),
-      userId: 1,
-      // System AI user ID
-      content: `\u{1F916} **AI Suggested Answer:**
-
-${aiResponse.answer}
-
-*This is an AI-generated response. Please verify the information and consider getting a human expert's opinion.*`,
-      isAccepted: false
-    });
-    await db.insert(notifications).values({
-      userId: question[0].userId,
-      title: "AI Mentor Response",
-      message: "An AI mentor has provided a suggested answer to your question",
-      type: "answer_received",
-      relatedId: parseInt(questionId),
-      relatedType: "question"
-    });
-    logger.info(`AI mentor response generated for question ${questionId}`, { confidence: aiResponse.confidence });
-    res.json({ response: mentorResponse[0], aiAnswer: aiResponse });
-  } catch (error) {
-    logger.error("Error triggering AI mentor:", error);
-    res.status(500).json({ error: "Failed to generate AI mentor response" });
-  }
-};
-var getAnswerQualityStats = async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const qualityStats = await db.execute(sql2`
-      SELECT 
-        COUNT(*) as total_answers,
-        AVG(CASE WHEN af.vote_type = 'up' THEN 1 ELSE 0 END) as upvote_rate,
-        AVG(ha.xp_rating) as avg_xp_rating,
-        AVG(ha.star_rating) as avg_star_rating,
-        COUNT(CASE WHEN ha.is_accepted = true THEN 1 END) as accepted_answers
-      FROM help_answers ha
-      LEFT JOIN answer_feedback af ON ha.id = af.answer_id
-      WHERE ha.user_id = ${parseInt(userId)}
-      GROUP BY ha.user_id
-    `);
-    const feedbackTrend = await db.execute(sql2`
-      SELECT 
-        DATE_TRUNC('week', af.created_at) as week,
-        COUNT(CASE WHEN af.vote_type = 'up' THEN 1 END) as upvotes,
-        COUNT(CASE WHEN af.vote_type = 'down' THEN 1 END) as downvotes
-      FROM answer_feedback af
-      JOIN help_answers ha ON af.answer_id = ha.id
-      WHERE ha.user_id = ${parseInt(userId)}
-      AND af.created_at >= NOW() - INTERVAL '12 weeks'
-      GROUP BY week
-      ORDER BY week DESC
-    `);
-    res.json({
-      qualityStats: qualityStats.rows[0] || {},
-      feedbackTrend: feedbackTrend.rows
-    });
-  } catch (error) {
-    logger.error("Error fetching answer quality stats:", error);
-    res.status(500).json({ error: "Failed to fetch quality stats" });
-  }
-};
+init_logger();
 var healthCheck = async (req, res) => {
   try {
-    const aiService = new AIService();
-    const testResponse = await aiService.healthCheck();
+    const testResponse = await AIService.checkHealth();
     res.json({
       status: "healthy",
       aiService: testResponse ? "connected" : "disconnected",
@@ -3779,236 +1913,1062 @@ var healthCheck = async (req, res) => {
   }
 };
 
-// server/controllers/adminController.ts
-var AdminController = class {
-  // Get system statistics
-  static async getSystemStats(req, res) {
+// server/controllers/authController.ts
+import passport from "passport";
+
+// server/storage/authStorage.ts
+import { eq as eq2, and as and2, gt, lt, or } from "drizzle-orm";
+var AuthStorage = class {
+  // User operations
+  static async getUserById(id) {
+    const [user] = await db.select().from(users).where(eq2(users.id, id));
+    return user;
+  }
+  static async getUserByEmail(email) {
+    const [user] = await db.select().from(users).where(eq2(users.email, email));
+    return user;
+  }
+  static async getUserByProviderId(provider, providerId) {
+    const [user] = await db.select().from(users).where(
+      and2(
+        eq2(users.provider, provider),
+        eq2(users.providerId, providerId)
+      )
+    );
+    return user;
+  }
+  static async createUser(userData) {
+    const [user] = await db.insert(users).values(userData).returning();
+    return user;
+  }
+  static async updateUser(id, updates) {
+    const [user] = await db.update(users).set({
+      ...updates,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq2(users.id, id)).returning();
+    return user;
+  }
+  static async linkProvider(userId, provider, providerId) {
+    const [user] = await db.update(users).set({
+      provider,
+      providerId,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq2(users.id, userId)).returning();
+    return user;
+  }
+  static async updateLastActivity(userId) {
+    await db.update(users).set({ updatedAt: /* @__PURE__ */ new Date() }).where(eq2(users.id, userId));
+  }
+  // Refresh token operations
+  static async createRefreshToken(tokenData) {
+    const [token] = await db.insert(refreshTokens).values(tokenData).returning();
+    return token;
+  }
+  static async getRefreshTokenByJti(jti) {
+    const now = /* @__PURE__ */ new Date();
+    const [token] = await db.select().from(refreshTokens).where(
+      and2(
+        eq2(refreshTokens.jti, jti),
+        eq2(refreshTokens.revoked, false),
+        gt(refreshTokens.expiresAt, now)
+      )
+    );
+    return token;
+  }
+  static async revokeRefreshToken(jti) {
+    await db.update(refreshTokens).set({ revoked: true }).where(eq2(refreshTokens.jti, jti));
+  }
+  static async revokeAllUserRefreshTokens(userId) {
+    await db.update(refreshTokens).set({ revoked: true }).where(eq2(refreshTokens.userId, userId));
+  }
+  static async cleanupExpiredRefreshTokens() {
+    const now = /* @__PURE__ */ new Date();
+    await db.delete(refreshTokens).where(
+      or(
+        eq2(refreshTokens.revoked, true),
+        lt(refreshTokens.expiresAt, now)
+      )
+    );
+  }
+  // User verification
+  static async markEmailAsVerified(userId) {
+    await db.update(users).set({
+      emailVerifiedAt: /* @__PURE__ */ new Date(),
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq2(users.id, userId));
+  }
+  // Account management
+  static async updatePassword(userId, passwordHash) {
+    await db.update(users).set({
+      passwordHash,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq2(users.id, userId));
+  }
+  static async deleteUser(userId) {
+    await this.revokeAllUserRefreshTokens(userId);
+    await db.delete(users).where(eq2(users.id, userId));
+  }
+  // Password reset token operations (using in-memory storage for now)
+  static passwordResetTokens = /* @__PURE__ */ new Map();
+  // Email verification token operations (using in-memory storage for now)
+  static emailVerificationTokens = /* @__PURE__ */ new Map();
+  static async createPasswordResetToken(data) {
+    this.passwordResetTokens.set(data.token, { userId: data.userId, expiresAt: data.expiresAt });
+  }
+  static async findPasswordResetToken(token) {
+    const tokenData = this.passwordResetTokens.get(token);
+    if (!tokenData) {
+      return null;
+    }
+    if (tokenData.expiresAt < /* @__PURE__ */ new Date()) {
+      this.passwordResetTokens.delete(token);
+      return null;
+    }
+    return tokenData;
+  }
+  static async deletePasswordResetToken(token) {
+    this.passwordResetTokens.delete(token);
+  }
+  // Email verification token operations
+  static async createEmailVerificationToken(data) {
+    this.emailVerificationTokens.set(data.token, { userId: data.userId, expiresAt: data.expiresAt });
+  }
+  static async findEmailVerificationToken(token) {
+    const tokenData = this.emailVerificationTokens.get(token);
+    if (!tokenData) {
+      return null;
+    }
+    if (tokenData.expiresAt < /* @__PURE__ */ new Date()) {
+      this.emailVerificationTokens.delete(token);
+      return null;
+    }
+    return tokenData;
+  }
+  static async deleteEmailVerificationToken(token) {
+    this.emailVerificationTokens.delete(token);
+  }
+  static async verifyUserEmail(userId) {
+    await this.markEmailAsVerified(userId);
+  }
+};
+
+// server/controllers/authController.ts
+init_auth();
+init_email();
+
+// server/utils/errors.ts
+var ERROR_CODES = {
+  // Authentication errors
+  INVALID_CREDENTIALS: "INVALID_CREDENTIALS",
+  TOKEN_EXPIRED: "TOKEN_EXPIRED",
+  INVALID_TOKEN: "INVALID_TOKEN",
+  REFRESH_TOKEN_EXPIRED: "REFRESH_TOKEN_EXPIRED",
+  // Validation errors
+  VALIDATION_ERROR: "VALIDATION_ERROR",
+  PASSWORD_TOO_WEAK: "PASSWORD_TOO_WEAK",
+  EMAIL_ALREADY_EXISTS: "EMAIL_ALREADY_EXISTS",
+  INVALID_EMAIL: "INVALID_EMAIL",
+  // Rate limiting
+  RATE_LIMITED: "RATE_LIMITED",
+  TOO_MANY_ATTEMPTS: "TOO_MANY_ATTEMPTS",
+  // General errors
+  INTERNAL_ERROR: "INTERNAL_ERROR",
+  NOT_FOUND: "NOT_FOUND",
+  FORBIDDEN: "FORBIDDEN",
+  UNAUTHORIZED: "UNAUTHORIZED",
+  // OAuth errors
+  GOOGLE_AUTH_FAILED: "GOOGLE_AUTH_FAILED",
+  OAUTH_CANCELLED: "OAUTH_CANCELLED"
+};
+var createErrorResponse = (error, code, details) => ({
+  success: false,
+  error,
+  code,
+  ...details && { details }
+});
+var AUTH_ERRORS = {
+  invalidCredentials: () => createErrorResponse(
+    "Invalid email or password",
+    ERROR_CODES.INVALID_CREDENTIALS
+  ),
+  tokenExpired: () => createErrorResponse(
+    "Access token has expired",
+    ERROR_CODES.TOKEN_EXPIRED
+  ),
+  invalidToken: () => createErrorResponse(
+    "Invalid or malformed token",
+    ERROR_CODES.INVALID_TOKEN
+  ),
+  refreshTokenExpired: () => createErrorResponse(
+    "Refresh token has expired. Please log in again",
+    ERROR_CODES.REFRESH_TOKEN_EXPIRED
+  ),
+  emailExists: () => createErrorResponse(
+    "An account with this email already exists",
+    ERROR_CODES.EMAIL_ALREADY_EXISTS
+  ),
+  weakPassword: (details) => createErrorResponse(
+    "Password does not meet security requirements",
+    ERROR_CODES.PASSWORD_TOO_WEAK,
+    { requirements: details }
+  ),
+  rateLimited: (retryAfter) => createErrorResponse(
+    "Too many attempts. Please try again later",
+    ERROR_CODES.RATE_LIMITED,
+    { retryAfter }
+  ),
+  googleAuthFailed: () => createErrorResponse(
+    "Google authentication failed",
+    ERROR_CODES.GOOGLE_AUTH_FAILED
+  ),
+  unauthorized: () => createErrorResponse(
+    "Authentication required",
+    ERROR_CODES.UNAUTHORIZED
+  ),
+  forbidden: () => createErrorResponse(
+    "Insufficient permissions",
+    ERROR_CODES.FORBIDDEN
+  )
+};
+
+// server/controllers/authController.ts
+init_logger();
+var AuthController = class {
+  // User registration with email/password
+  static async register(req, res) {
+    const startTime = Date.now();
+    const requestId = `reg-${Math.random().toString(36).substr(2, 9)}`;
+    logger.info(`[${requestId}] Registration request started`, {
+      ip: req.ip,
+      userAgent: req.get("User-Agent"),
+      body: { ...req.body, password: "[REDACTED]" }
+    });
     try {
-      const stats = {
-        users: {
-          total: 0,
-          students: 0,
-          instructors: 0,
-          admins: 0,
-          activeThisMonth: 0
-        },
-        courses: {
-          total: 0,
-          published: 0,
-          enrollments: 0,
-          completions: 0
-        },
-        engagement: {
-          dailyActiveUsers: 0,
-          averageSessionTime: 0,
-          totalLearningHours: 0
-        },
-        ai: {
-          totalRequests: 0,
-          summariesGenerated: 0,
-          questionsGenerated: 0,
-          chatInteractions: 0
-        },
-        systemHealth: {
-          status: "good",
-          uptime: process.uptime(),
-          memoryUsage: process.memoryUsage(),
-          dbConnectionStatus: "connected"
+      logger.info(`[${requestId}] Step 1: Validating request body`);
+      const validatedData = registerSchema.parse(req.body);
+      const { email, password, name, role, domain, branch, year } = validatedData;
+      logger.info(`[${requestId}] Request body validation successful`, {
+        email,
+        name,
+        role: role || "student",
+        hasOptionalFields: { domain: !!domain, branch: !!branch, year: !!year }
+      });
+      logger.info(`[${requestId}] Step 2: Normalizing email`);
+      const normalizedEmail = email.toLowerCase().trim();
+      logger.info(`[${requestId}] Email normalized: ${email} -> ${normalizedEmail}`);
+      logger.info(`[${requestId}] Step 3: Validating email format`);
+      if (!validateEmail(normalizedEmail)) {
+        logger.warn(`[${requestId}] Email validation failed for: ${normalizedEmail}`);
+        res.status(400).json({
+          success: false,
+          error: "Invalid email format",
+          code: ERROR_CODES.INVALID_EMAIL
+        });
+        return;
+      }
+      logger.info(`[${requestId}] Email format validation passed`);
+      logger.info(`[${requestId}] Step 4: Validating password strength`);
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.isValid) {
+        logger.warn(`[${requestId}] Password validation failed`, {
+          errors: passwordValidation.errors
+        });
+        res.status(400).json(AUTH_ERRORS.weakPassword(passwordValidation.errors));
+        return;
+      }
+      logger.info(`[${requestId}] Password validation passed`);
+      logger.info(`[${requestId}] Step 5: Checking for existing user`);
+      const existingUser = await AuthStorage.getUserByEmail(normalizedEmail);
+      if (existingUser) {
+        logger.warn(`[${requestId}] Registration failed - user already exists`, {
+          email: normalizedEmail,
+          existingUserId: existingUser.id
+        });
+        res.status(409).json(AUTH_ERRORS.emailExists());
+        return;
+      }
+      logger.info(`[${requestId}] No existing user found - proceeding with registration`);
+      logger.info(`[${requestId}] Step 6: Hashing password`);
+      const hashStartTime = Date.now();
+      const passwordHash = await hashPassword(password);
+      const hashDuration = Date.now() - hashStartTime;
+      logger.info(`[${requestId}] Password hashed successfully (${hashDuration}ms)`);
+      logger.info(`[${requestId}] Step 7: Creating user in database`);
+      const dbStartTime = Date.now();
+      const user = await AuthStorage.createUser({
+        email: normalizedEmail,
+        passwordHash,
+        name,
+        provider: "local",
+        role: role || "student",
+        domain,
+        branch,
+        year
+      });
+      const dbDuration = Date.now() - dbStartTime;
+      logger.info(`[${requestId}] User created successfully in database (${dbDuration}ms)`, {
+        userId: user.id,
+        email: user.email,
+        role: user.role
+      });
+      logger.info(`[${requestId}] Step 8: Generating authentication tokens`);
+      const tokenStartTime = Date.now();
+      const accessToken = generateAccessToken({
+        userId: user.id,
+        email: user.email,
+        role: user.role
+      });
+      const { token: refreshToken, jti } = generateRefreshToken(user.id);
+      const tokenDuration = Date.now() - tokenStartTime;
+      logger.info(`[${requestId}] Tokens generated successfully (${tokenDuration}ms)`, {
+        accessTokenLength: accessToken.length,
+        refreshTokenJti: jti
+      });
+      logger.info(`[${requestId}] Step 9: Storing refresh token in database`);
+      const refreshStartTime = Date.now();
+      await AuthStorage.createRefreshToken({
+        userId: user.id,
+        jti,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1e3),
+        // 7 days
+        userAgent: req.get("User-Agent") || null,
+        ipAddress: req.ip || null
+      });
+      const refreshDuration = Date.now() - refreshStartTime;
+      logger.info(`[${requestId}] Refresh token stored successfully (${refreshDuration}ms)`);
+      logger.info(`[${requestId}] Step 10: Setting refresh token cookie`);
+      res.cookie("refreshToken", refreshToken, getCookieOptions());
+      logger.info(`[${requestId}] Refresh token cookie set`);
+      logger.info(`[${requestId}] Step 11: Sending email verification`);
+      const emailStartTime = Date.now();
+      const emailToken = generateSecureToken();
+      await AuthStorage.createEmailVerificationToken({
+        userId: user.id,
+        token: emailToken,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1e3)
+      });
+      const emailResult = await sendVerificationEmail(user.email, user.name, emailToken);
+      const emailDuration = Date.now() - emailStartTime;
+      const emailSent = typeof emailResult === "boolean" ? emailResult : emailResult.success;
+      const testData = typeof emailResult === "object" && emailResult.testData ? emailResult.testData : void 0;
+      if (!emailSent) {
+        logger.warn(`[${requestId}] Email verification failed to send`, { email: user.email });
+      }
+      logger.info(`[${requestId}] Email verification ${emailSent ? "sent" : "failed"} (${emailDuration}ms)`, {
+        hasTestData: !!testData
+      });
+      const totalDuration = Date.now() - startTime;
+      logger.info(`[${requestId}] Registration completed successfully`, {
+        userId: user.id,
+        email: user.email,
+        emailVerificationSent: emailSent,
+        totalDurationMs: totalDuration,
+        performance: {
+          validation: "N/A",
+          passwordHashing: `${hashDuration}ms`,
+          databaseInsert: `${dbDuration}ms`,
+          tokenGeneration: `${tokenDuration}ms`,
+          refreshTokenStorage: `${refreshDuration}ms`,
+          emailSending: `${emailDuration}ms`
         }
+      });
+      const responseData = {
+        user: sanitizeUserData(user),
+        accessToken,
+        emailVerificationSent: emailSent
       };
-      res.json({
+      if (testData && process.env.NODE_ENV !== "production") {
+        responseData.testData = testData;
+      }
+      res.status(201).json({
         success: true,
-        data: stats
+        message: "User registered successfully. Please check your email to verify your account.",
+        data: responseData
       });
     } catch (error) {
-      logger.error("Get system stats error:", error);
-      throw createValidationError("Failed to fetch system statistics");
+      const totalDuration = Date.now() - startTime;
+      logger.error(`[${requestId}] Registration failed after ${totalDuration}ms`, {
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        } : error,
+        ip: req.ip,
+        userAgent: req.get("User-Agent")
+      });
+      if (error instanceof Error) {
+        if (error.message.includes("duplicate key")) {
+          logger.warn(`[${requestId}] Database constraint violation - duplicate user`, { error: error.message });
+          res.status(409).json({
+            success: false,
+            error: "An account with this email already exists"
+          });
+          return;
+        }
+        if (error.message.includes("validation")) {
+          logger.warn(`[${requestId}] Schema validation error`, { error: error.message });
+          res.status(400).json({
+            success: false,
+            error: "Invalid registration data provided"
+          });
+          return;
+        }
+      }
+      res.status(500).json({
+        success: false,
+        error: "Registration failed due to internal server error"
+      });
     }
   }
-  // Manage user roles
-  static async updateUserRole(req, res) {
+  // User login with email/password
+  static async login(req, res, next) {
     try {
-      const { userId, newRole } = req.body;
-      if (!userId || !newRole) {
-        throw createValidationError("User ID and new role are required");
+      const validatedData = loginSchema.parse(req.body);
+      passport.authenticate("local", { session: false }, async (err, user, info) => {
+        if (err) {
+          logger.error("Login error:", err);
+          res.status(500).json({
+            success: false,
+            error: "Login failed"
+          });
+          return;
+        }
+        if (!user) {
+          res.status(401).json({
+            success: false,
+            error: info?.message || "Invalid credentials"
+          });
+          return;
+        }
+        try {
+          logger.info("User logged in successfully", { userId: user.id, email: user.email });
+          const accessToken = generateAccessToken({
+            userId: user.id,
+            email: user.email,
+            role: user.role
+          });
+          const { token: refreshToken, jti } = generateRefreshToken(user.id);
+          await AuthStorage.createRefreshToken({
+            userId: user.id,
+            jti,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1e3),
+            // 7 days
+            userAgent: req.get("User-Agent") || null,
+            ipAddress: req.ip || null
+          });
+          res.cookie("refreshToken", refreshToken, getCookieOptions());
+          res.json({
+            success: true,
+            message: "Login successful",
+            data: {
+              user: sanitizeUserData(user),
+              accessToken
+            }
+          });
+        } catch (tokenError) {
+          logger.error("Token generation error:", tokenError);
+          res.status(500).json({
+            success: false,
+            error: "Login failed"
+          });
+        }
+      })(req, res, next);
+    } catch (error) {
+      logger.error("Login validation error:", error);
+      res.status(400).json({
+        success: false,
+        error: "Invalid request data"
+      });
+    }
+  }
+  // Google OAuth redirect
+  static googleAuth(req, res, next) {
+    passport.authenticate("google", {
+      scope: ["profile", "email"],
+      prompt: "select_account"
+      // Force Google account selection
+    })(req, res, next);
+  }
+  // Google OAuth callback
+  static async googleCallback(req, res, next) {
+    passport.authenticate("google", { session: false }, async (err, user) => {
+      if (err) {
+        logger.error("Google OAuth error:", err);
+        res.redirect(`${process.env.FRONTEND_URL}/auth/error?message=google_auth_failed`);
+        return;
       }
-      if (!["student", "instructor", "admin"].includes(newRole)) {
-        throw createValidationError("Invalid role specified");
+      if (!user) {
+        res.redirect(`${process.env.FRONTEND_URL}/auth/error?message=google_auth_cancelled`);
+        return;
       }
-      logger.info(`Admin ${req.user.id} updated user ${userId} role to ${newRole}`);
+      try {
+        logger.info("Google OAuth successful", { userId: user.id, email: user.email });
+        const accessToken = generateAccessToken({
+          userId: user.id,
+          email: user.email,
+          role: user.role
+        });
+        const { token: refreshToken, jti } = generateRefreshToken(user.id);
+        await AuthStorage.createRefreshToken({
+          userId: user.id,
+          jti,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1e3),
+          // 7 days
+          userAgent: req.get("User-Agent") || null,
+          ipAddress: req.ip || null
+        });
+        res.cookie("refreshToken", refreshToken, getCookieOptions());
+        res.redirect(`${process.env.FRONTEND_URL}/auth/google-success`);
+      } catch (tokenError) {
+        logger.error("Google OAuth token generation error:", tokenError);
+        res.redirect(`${process.env.FRONTEND_URL}/auth/error?message=token_generation_failed`);
+      }
+    })(req, res, next);
+  }
+  // Refresh access token
+  static async refreshToken(req, res) {
+    try {
+      const refreshToken = req.cookies.refreshToken;
+      if (!refreshToken) {
+        res.status(401).json({
+          success: false,
+          error: "No refresh token provided"
+        });
+        return;
+      }
+      const payload = verifyRefreshToken(refreshToken);
+      const storedToken = await AuthStorage.getRefreshTokenByJti(payload.jti);
+      if (!storedToken) {
+        res.status(401).json({
+          success: false,
+          error: "Invalid refresh token"
+        });
+        return;
+      }
+      const user = await AuthStorage.getUserById(payload.userId);
+      if (!user) {
+        res.status(401).json({
+          success: false,
+          error: "User not found"
+        });
+        return;
+      }
+      await AuthStorage.revokeRefreshToken(payload.jti);
+      const accessToken = generateAccessToken({
+        userId: user.id,
+        email: user.email,
+        role: user.role
+      });
+      const { token: newRefreshToken, jti: newJti } = generateRefreshToken(user.id);
+      await AuthStorage.createRefreshToken({
+        userId: user.id,
+        jti: newJti,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1e3),
+        // 7 days
+        userAgent: req.get("User-Agent") || null,
+        ipAddress: req.ip || null
+      });
+      res.cookie("refreshToken", newRefreshToken, getCookieOptions());
       res.json({
         success: true,
-        message: `User role updated to ${newRole}`,
-        data: { userId, newRole }
+        data: {
+          accessToken,
+          user: sanitizeUserData(user)
+        }
       });
     } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Update user role error:", error);
-      throw createValidationError("Failed to update user role");
+      logger.error("Token refresh error:", error);
+      res.status(401).json({
+        success: false,
+        error: "Token refresh failed"
+      });
     }
   }
-  // System configuration
-  static async updateSystemConfig(req, res) {
+  // Logout user
+  static async logout(req, res) {
     try {
-      const config = req.body;
-      logger.info(`Admin ${req.user.id} updated system configuration`, { config });
+      const refreshToken = req.cookies.refreshToken;
+      if (refreshToken) {
+        try {
+          const payload = verifyRefreshToken(refreshToken);
+          await AuthStorage.revokeRefreshToken(payload.jti);
+        } catch (error) {
+          logger.debug("Error revoking refresh token during logout:", error);
+        }
+      }
+      res.clearCookie("refreshToken");
       res.json({
         success: true,
-        message: "System configuration updated",
-        data: config
+        message: "Logout successful"
       });
     } catch (error) {
-      logger.error("Update system config error:", error);
-      throw createValidationError("Failed to update system configuration");
+      logger.error("Logout error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Logout failed"
+      });
     }
   }
-  // Content moderation
-  static async moderateContent(req, res) {
+  // Get current user profile
+  static async getProfile(req, res) {
     try {
-      const { contentId, contentType, action, reason } = req.body;
-      if (!contentId || !contentType || !action) {
-        throw createValidationError("Content ID, type, and action are required");
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          error: "Not authenticated"
+        });
+        return;
       }
-      logger.info(`Admin ${req.user.id} moderated ${contentType} ${contentId}: ${action}`, { reason });
+      const user = await AuthStorage.getUserById(req.user.id);
+      if (!user) {
+        res.status(404).json({
+          success: false,
+          error: "User not found"
+        });
+        return;
+      }
       res.json({
         success: true,
-        message: `Content ${action} successfully`,
-        data: { contentId, contentType, action }
+        data: {
+          user: sanitizeUserData(user)
+        }
       });
     } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Content moderation error:", error);
-      throw createValidationError("Failed to moderate content");
+      logger.error("Get profile error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch profile"
+      });
     }
   }
-  // Analytics export
-  static async exportAnalytics(req, res) {
+  // Update user profile
+  static async updateProfile(req, res) {
     try {
-      const { startDate, endDate, format = "json" } = req.query;
-      const exportData = {
-        exportId: Date.now().toString(),
-        generatedAt: /* @__PURE__ */ new Date(),
-        period: { startDate, endDate },
-        format,
-        downloadUrl: `/api/admin/exports/${Date.now()}`
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          error: "Not authenticated"
+        });
+        return;
+      }
+      const validatedData = updateProfileSchema.parse(req.body);
+      const user = await AuthStorage.updateUser(req.user.id, validatedData);
+      logger.info("User profile updated", { userId: user.id });
+      res.json({
+        success: true,
+        message: "Profile updated successfully",
+        data: {
+          user: sanitizeUserData(user)
+        }
+      });
+    } catch (error) {
+      logger.error("Update profile error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to update profile"
+      });
+    }
+  }
+  // Forgot password - request reset email
+  static async forgotPassword(req, res) {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        res.status(400).json({
+          success: false,
+          error: "Email is required",
+          code: ERROR_CODES.VALIDATION_ERROR
+        });
+        return;
+      }
+      const normalizedEmail = email.toLowerCase().trim();
+      if (!validateEmail(normalizedEmail)) {
+        res.status(400).json({
+          success: false,
+          error: "Invalid email format",
+          code: ERROR_CODES.INVALID_EMAIL
+        });
+        return;
+      }
+      const user = await AuthStorage.getUserByEmail(normalizedEmail);
+      let testData = void 0;
+      if (user && user.passwordHash) {
+        const resetToken = generateSecureToken();
+        const expiresAt = new Date(Date.now() + 30 * 60 * 1e3);
+        await AuthStorage.createPasswordResetToken({
+          userId: user.id,
+          token: resetToken,
+          expiresAt
+        });
+        const emailResult = await sendPasswordResetEmail(user.email, user.name, resetToken);
+        const emailSent = typeof emailResult === "boolean" ? emailResult : emailResult.success;
+        testData = typeof emailResult === "object" && emailResult.testData ? emailResult.testData : void 0;
+        logger.info("Password reset requested", {
+          userId: user.id,
+          email: user.email,
+          emailSent,
+          hasTestData: !!testData
+        });
+        if (!emailSent) {
+          logger.warn("Password reset email failed to send", { email: user.email });
+        }
+      }
+      const responseData = {
+        success: true,
+        message: "If an account with that email exists, a password reset link has been sent"
       };
-      logger.info(`Admin ${req.user.id} requested analytics export`, { startDate, endDate, format });
+      if (user && testData && process.env.NODE_ENV !== "production") {
+        responseData.testData = testData;
+      }
+      res.json(responseData);
+    } catch (error) {
+      logger.error("Forgot password error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to process password reset request"
+      });
+    }
+  }
+  // Reset password with token
+  static async resetPassword(req, res) {
+    try {
+      const { token, newPassword } = req.body;
+      if (!token || !newPassword) {
+        res.status(400).json({
+          success: false,
+          error: "Reset token and new password are required"
+        });
+        return;
+      }
+      const passwordValidation = validatePassword(newPassword);
+      if (!passwordValidation.isValid) {
+        res.status(400).json(AUTH_ERRORS.weakPassword(passwordValidation.errors));
+        return;
+      }
+      const resetRecord = await AuthStorage.findPasswordResetToken(token);
+      if (!resetRecord || resetRecord.expiresAt < /* @__PURE__ */ new Date()) {
+        res.status(400).json({
+          success: false,
+          error: "Invalid or expired reset token",
+          code: ERROR_CODES.INVALID_TOKEN
+        });
+        return;
+      }
+      const newPasswordHash = await hashPassword(newPassword);
+      await AuthStorage.updatePassword(resetRecord.userId, newPasswordHash);
+      await AuthStorage.deletePasswordResetToken(token);
+      await AuthStorage.revokeAllUserRefreshTokens(resetRecord.userId);
+      logger.info("Password reset successful", { userId: resetRecord.userId });
       res.json({
         success: true,
-        message: "Analytics export initiated",
-        data: exportData
+        message: "Password has been reset successfully. Please log in with your new password."
       });
     } catch (error) {
-      logger.error("Export analytics error:", error);
-      throw createValidationError("Failed to export analytics");
+      logger.error("Reset password error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to reset password"
+      });
+    }
+  }
+  // Change password
+  static async changePassword(req, res) {
+    try {
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          error: "Not authenticated"
+        });
+        return;
+      }
+      const validatedData = changePasswordSchema.parse(req.body);
+      const { currentPassword, newPassword } = validatedData;
+      const user = await AuthStorage.getUserById(req.user.id);
+      if (!user) {
+        res.status(404).json({
+          success: false,
+          error: "User not found"
+        });
+        return;
+      }
+      if (!user.passwordHash) {
+        res.status(400).json({
+          success: false,
+          error: "Cannot change password for OAuth-only accounts"
+        });
+        return;
+      }
+      const { comparePassword: comparePassword2 } = await Promise.resolve().then(() => (init_auth(), auth_exports));
+      const isValidPassword = await comparePassword2(currentPassword, user.passwordHash);
+      if (!isValidPassword) {
+        res.status(401).json({
+          success: false,
+          error: "Current password is incorrect"
+        });
+        return;
+      }
+      const passwordValidation = validatePassword(newPassword);
+      if (!passwordValidation.isValid) {
+        res.status(400).json({
+          success: false,
+          error: "New password validation failed",
+          details: passwordValidation.errors
+        });
+        return;
+      }
+      const newPasswordHash = await hashPassword(newPassword);
+      await AuthStorage.updatePassword(user.id, newPasswordHash);
+      await AuthStorage.revokeAllUserRefreshTokens(user.id);
+      logger.info("User password changed", { userId: user.id });
+      res.json({
+        success: true,
+        message: "Password changed successfully. Please log in again."
+      });
+    } catch (error) {
+      logger.error("Change password error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to change password"
+      });
     }
   }
 };
 
-// server/middleware/validator.ts
-import { z, ZodError } from "zod";
-var validateRequest = (schema) => {
-  return (req, res, next) => {
+// server/controllers/emailController.ts
+init_logger();
+var EmailController = class {
+  // Verify email address
+  static async verifyEmail(req, res) {
     try {
-      if (schema.body) {
-        req.body = schema.body.parse(req.body);
-      }
-      if (schema.query) {
-        req.query = schema.query.parse(req.query);
-      }
-      if (schema.params) {
-        req.params = schema.params.parse(req.params);
-      }
-      next();
-    } catch (error) {
-      if (error instanceof ZodError) {
-        return res.status(400).json({
-          error: "Validation failed",
-          details: error.errors.map((err) => ({
-            field: err.path.join("."),
-            message: err.message
-          }))
+      const { token } = req.query;
+      if (!token || typeof token !== "string") {
+        res.status(400).json({
+          success: false,
+          error: "Verification token is required",
+          code: ERROR_CODES.VALIDATION_ERROR
         });
+        return;
       }
-      res.status(500).json({ error: "Internal server error" });
+      const tokenData = await AuthStorage.findEmailVerificationToken(token);
+      if (!tokenData) {
+        res.status(400).json({
+          success: false,
+          error: "Invalid or expired verification token",
+          code: ERROR_CODES.INVALID_TOKEN
+        });
+        return;
+      }
+      const user = await AuthStorage.getUserById(tokenData.userId);
+      if (!user) {
+        res.status(404).json({
+          success: false,
+          error: "User not found",
+          code: ERROR_CODES.INVALID_TOKEN
+        });
+        return;
+      }
+      if (user.emailVerifiedAt) {
+        res.json({
+          success: true,
+          message: "Email has already been verified",
+          data: { alreadyVerified: true }
+        });
+        return;
+      }
+      await AuthStorage.verifyUserEmail(tokenData.userId);
+      await AuthStorage.deleteEmailVerificationToken(token);
+      logger.info("Email verification successful", { userId: tokenData.userId, email: user.email });
+      res.json({
+        success: true,
+        message: "Email verified successfully! You can now access all features.",
+        data: { verified: true }
+      });
+    } catch (error) {
+      logger.error("Email verification error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Email verification failed"
+      });
     }
+  }
+  // Resend verification email
+  static async resendVerification(req, res) {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        res.status(400).json({
+          success: false,
+          error: "Email is required",
+          code: ERROR_CODES.VALIDATION_ERROR
+        });
+        return;
+      }
+      const normalizedEmail = email.toLowerCase().trim();
+      const user = await AuthStorage.getUserByEmail(normalizedEmail);
+      if (!user) {
+        res.json({
+          success: true,
+          message: "If an account with that email exists and is unverified, a verification email has been sent"
+        });
+        return;
+      }
+      if (user.emailVerifiedAt) {
+        res.json({
+          success: true,
+          message: "Email is already verified"
+        });
+        return;
+      }
+      const { generateSecureToken: generateSecureToken2 } = await Promise.resolve().then(() => (init_auth(), auth_exports));
+      const { sendVerificationEmail: sendVerificationEmail2 } = await Promise.resolve().then(() => (init_email(), email_exports));
+      const emailToken = generateSecureToken2();
+      await AuthStorage.createEmailVerificationToken({
+        userId: user.id,
+        token: emailToken,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1e3)
+      });
+      const emailSent = await sendVerificationEmail2(user.email, user.name, emailToken);
+      if (!emailSent) {
+        logger.warn("Resend verification email failed", { email: user.email });
+      }
+      logger.info("Verification email resent", { userId: user.id, email: user.email, sent: emailSent });
+      res.json({
+        success: true,
+        message: "Verification email has been sent"
+      });
+    } catch (error) {
+      logger.error("Resend verification error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to resend verification email"
+      });
+    }
+  }
+};
+
+// server/middleware/auth.ts
+init_auth();
+init_logger();
+var extractTokenFromHeader = (req) => {
+  const authHeader = req.header("Authorization");
+  if (!authHeader) return null;
+  const parts = authHeader.split(" ");
+  if (parts.length !== 2 || parts[0] !== "Bearer") {
+    return null;
+  }
+  return parts[1];
+};
+var authenticateJWT = async (req, res, next) => {
+  try {
+    const token = extractTokenFromHeader(req);
+    if (!token) {
+      res.status(401).json({
+        success: false,
+        error: "No authentication token provided"
+      });
+      return;
+    }
+    const payload = verifyAccessToken(token);
+    const user = await AuthStorage.getUserById(payload.userId);
+    if (!user) {
+      res.status(401).json({
+        success: false,
+        error: "User not found"
+      });
+      return;
+    }
+    req.user = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      provider: user.provider,
+      imageUrl: user.imageUrl
+    };
+    next();
+  } catch (error) {
+    logger.error("JWT authentication error:", error);
+    if (error instanceof Error) {
+      if (error.message === "Access token expired") {
+        res.status(401).json({
+          success: false,
+          error: "Token expired",
+          code: "TOKEN_EXPIRED"
+        });
+        return;
+      } else if (error.message === "Invalid access token") {
+        res.status(401).json({
+          success: false,
+          error: "Invalid token",
+          code: "INVALID_TOKEN"
+        });
+        return;
+      }
+    }
+    res.status(401).json({
+      success: false,
+      error: "Authentication failed"
+    });
+  }
+};
+var requireAuth = (req, res, next) => {
+  if (!req.user) {
+    res.status(401).json({
+      success: false,
+      error: "Authentication required"
+    });
+    return;
+  }
+  next();
+};
+var authorize = (roles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        error: "Authentication required"
+      });
+      return;
+    }
+    if (!roles.includes(req.user.role)) {
+      res.status(403).json({
+        success: false,
+        error: "Insufficient permissions"
+      });
+      return;
+    }
+    next();
   };
 };
-var paginationSchema = z.object({
-  page: z.string().transform((val) => parseInt(val) || 1),
-  limit: z.string().transform((val) => Math.min(parseInt(val) || 10, 100)),
-  sort: z.string().optional(),
-  order: z.enum(["asc", "desc"]).optional().default("desc")
-});
-var idParamSchema = z.object({
-  id: z.string().transform((val) => parseInt(val))
-});
-var searchQuerySchema = z.object({
-  q: z.string().min(1).max(200).optional(),
-  category: z.string().optional(),
-  tags: z.string().optional()
-});
-var registerSchema = z.object({
-  username: z.string().min(3).max(50).regex(/^[a-zA-Z0-9_]+$/),
-  password: z.string().min(8).max(128),
-  fullName: z.string().min(2).max(100),
-  email: z.string().email(),
-  role: z.enum(["student", "instructor"]).optional(),
-  domain: z.string().optional(),
-  branch: z.string().optional(),
-  year: z.string().optional()
-});
-var loginSchema = z.object({
-  username: z.string().min(1),
-  password: z.string().min(1)
-});
-var createCourseSchema = z.object({
-  title: z.string().min(1).max(200),
-  description: z.string().min(10).max(2e3),
-  domain: z.string().min(1).max(100),
-  price: z.number().min(0).max(9999.99),
-  level: z.enum(["beginner", "intermediate", "advanced"]),
-  thumbnail: z.string().url().optional(),
-  duration: z.string().optional()
-});
-var createQuestionSchema = z.object({
-  title: z.string().min(5).max(200),
-  content: z.string().min(10).max(5e3),
-  categoryId: z.number().positive(),
-  tags: z.array(z.string().max(30)).max(5).optional(),
-  bountyXP: z.number().min(0).max(100).optional()
-});
-var createAnswerSchema = z.object({
-  content: z.string().min(10).max(5e3)
-});
-var rateAnswerSchema = z.object({
-  xpRating: z.number().min(1).max(10).optional(),
-  starRating: z.number().min(1).max(5).optional()
-});
-var createSubscriptionSchema = z.object({
-  planId: z.number().positive(),
-  paymentMethodId: z.string().min(1)
-});
-var applyCouponSchema = z.object({
-  code: z.string().min(1).max(50),
-  courseId: z.number().positive().optional()
-});
-var analyticsQuerySchema = z.object({
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
-  courseId: z.number().positive().optional(),
-  userId: z.number().positive().optional(),
-  activityType: z.enum(["lesson_view", "lesson_complete", "quiz_attempt", "note_taken", "bookmark_added", "forum_post"]).optional()
-});
-var fileUploadSchema = z.object({
-  type: z.enum(["video", "image", "document", "subtitle"]),
-  maxSize: z.number().optional(),
-  allowedTypes: z.array(z.string()).optional()
-});
+var requireAdmin = authorize(["admin"]);
+var requireInstructor = async (req, res, next) => {
+  if (!req.user) {
+    res.status(401).json({
+      success: false,
+      error: "Authentication required"
+    });
+    return;
+  }
+  if (!["instructor", "admin"].includes(req.user.role)) {
+    res.status(403).json({
+      success: false,
+      error: "Instructor access required"
+    });
+    return;
+  }
+  if (req.user.role === "instructor") {
+    const user = await AuthStorage.getUserById(req.user.id);
+    if (!user || user.instructorStatus !== "approved") {
+      res.status(403).json({
+        success: false,
+        error: "Instructor approval required"
+      });
+      return;
+    }
+  }
+  next();
+};
+var requireStudent = authorize(["student", "instructor", "admin"]);
 
 // server/middleware/rateLimiter.ts
 var RateLimiter = class {
@@ -4024,11 +2984,13 @@ var RateLimiter = class {
   }
   cleanup() {
     const now = Date.now();
-    for (const [key, client] of this.clients.entries()) {
+    const keysToDelete = [];
+    this.clients.forEach((client, key) => {
       if (now > client.resetTime) {
-        this.clients.delete(key);
+        keysToDelete.push(key);
       }
-    }
+    });
+    keysToDelete.forEach((key) => this.clients.delete(key));
   }
   middleware = (req, res, next) => {
     const clientId = req.ip || "unknown";
@@ -4081,6 +3043,79 @@ var uploadLimiter = new RateLimiter({
   message: "Upload rate limit exceeded, please wait before uploading again"
 });
 
+// server/middleware/errorHandler.ts
+init_logger();
+var AppError = class extends Error {
+  statusCode;
+  isOperational;
+  constructor(message, statusCode = 500, isOperational = true) {
+    super(message);
+    this.statusCode = statusCode;
+    this.isOperational = isOperational;
+    Error.captureStackTrace(this, this.constructor);
+  }
+};
+var asyncHandler = (fn) => {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+};
+var errorHandler = (err, req, res, next) => {
+  let error = { ...err };
+  error.message = err.message;
+  logger.error(err);
+  if (err.name === "CastError") {
+    const message2 = "Resource not found";
+    error = new AppError(message2, 404);
+  }
+  if (err.name === "MongoError" && err.code === 11e3) {
+    const message2 = "Duplicate field value entered";
+    error = new AppError(message2, 400);
+  }
+  if (err.name === "ValidationError") {
+    const message2 = Object.values(err.errors).map((val) => val.message);
+    error = new AppError(message2.join(", "), 400);
+  }
+  if (err.name === "JsonWebTokenError") {
+    const message2 = "Invalid token";
+    error = new AppError(message2, 401);
+  }
+  if (err.name === "TokenExpiredError") {
+    const message2 = "Token expired";
+    error = new AppError(message2, 401);
+  }
+  if (err.message?.includes("connect ECONNREFUSED")) {
+    const message2 = "Database connection failed";
+    error = new AppError(message2, 503);
+  }
+  if (err.message?.includes("DeepSeek") || err.message?.includes("OpenAI")) {
+    const message2 = "AI service temporarily unavailable";
+    error = new AppError(message2, 503);
+  }
+  if (err.message?.includes("File too large")) {
+    const message2 = "File size exceeds limit";
+    error = new AppError(message2, 413);
+  }
+  if (err.message?.includes("Too many requests")) {
+    error = new AppError(err.message, 429);
+  }
+  const statusCode = error.statusCode || 500;
+  const message = error.message || "Internal Server Error";
+  const errorResponse = {
+    success: false,
+    error: message,
+    ...process.env.NODE_ENV === "development" && {
+      stack: err.stack,
+      details: error
+    }
+  };
+  res.status(statusCode).json(errorResponse);
+};
+var notFound = (req, res, next) => {
+  const error = new AppError(`Route ${req.originalUrl} not found`, 404);
+  next(error);
+};
+
 // server/routes.ts
 var router = express.Router();
 router.use(generalLimiter.middleware);
@@ -4092,367 +3127,95 @@ router.get("/health", (req, res) => {
   });
 });
 router.get("/health/ai", asyncHandler(healthCheck));
-router.post(
-  "/auth/register",
-  authLimiter.middleware,
-  validateRequest({ body: registerSchema }),
-  asyncHandler(AuthController.register)
-);
-router.post(
-  "/auth/login",
-  authLimiter.middleware,
-  validateRequest({ body: loginSchema }),
-  asyncHandler(AuthController.login)
-);
-router.post(
-  "/auth/refresh",
-  authenticate,
-  asyncHandler(refreshToken)
-);
-router.post(
-  "/auth/logout",
-  authenticate,
-  asyncHandler(AuthController.logout)
-);
-router.get(
-  "/auth/profile",
-  authenticate,
-  asyncHandler(AuthController.getProfile)
-);
-router.put(
-  "/auth/profile",
-  authenticate,
-  asyncHandler(AuthController.updateProfile)
-);
-router.put(
-  "/auth/change-password",
-  authenticate,
-  asyncHandler(AuthController.changePassword)
-);
-router.get(
-  "/auth/dashboard",
-  authenticate,
-  asyncHandler(AuthController.getDashboard)
-);
-router.get(
-  "/courses",
-  validateRequest({ query: paginationSchema }),
-  asyncHandler(CourseController.getCourses)
-);
-router.get(
-  "/courses/:id",
-  validateRequest({ params: idParamSchema }),
-  asyncHandler(CourseController.getCourse)
-);
-router.post(
-  "/courses",
-  authenticate,
-  authorize(["instructor", "admin"]),
-  validateRequest({ body: createCourseSchema }),
-  asyncHandler(CourseController.createCourse)
-);
-router.put(
-  "/courses/:id",
-  authenticate,
-  authorize(["instructor", "admin"]),
-  validateRequest({ params: idParamSchema }),
-  asyncHandler(CourseController.updateCourse)
-);
-router.delete(
-  "/courses/:id",
-  authenticate,
-  authorize(["instructor", "admin"]),
-  validateRequest({ params: idParamSchema }),
-  asyncHandler(CourseController.deleteCourse)
-);
-router.post(
-  "/courses/:id/enroll",
-  authenticate,
-  authorize(["student"]),
-  validateRequest({ params: idParamSchema }),
-  asyncHandler(CourseController.enrollInCourse)
-);
-router.get(
-  "/my-courses",
-  authenticate,
-  authorize(["student"]),
-  asyncHandler(CourseController.getUserCourses)
-);
-router.get(
-  "/instructor-courses",
-  authenticate,
-  authorize(["instructor", "admin"]),
-  asyncHandler(CourseController.getInstructorCourses)
-);
-router.post(
-  "/courses/:courseId/modules",
-  authenticate,
-  authorize(["instructor", "admin"]),
-  asyncHandler(CourseController.addModule)
-);
-router.post(
-  "/modules/:moduleId/lessons",
-  authenticate,
-  authorize(["instructor", "admin"]),
-  asyncHandler(CourseController.addLesson)
-);
-router.put(
-  "/courses/:courseId/lessons/:lessonId/complete",
-  authenticate,
-  authorize(["student"]),
-  asyncHandler(CourseController.completeLesson)
-);
-router.get(
-  "/courses/:id/analytics",
-  authenticate,
-  authorize(["instructor", "admin"]),
-  validateRequest({ params: idParamSchema }),
-  asyncHandler(CourseController.getCourseAnalytics)
-);
-router.get(
-  "/gamification/stats",
-  authenticate,
-  asyncHandler(GamificationController.getUserStats)
-);
-router.get(
-  "/gamification/leaderboard",
-  asyncHandler(GamificationController.getLeaderboard)
-);
-router.post(
-  "/gamification/award-xp",
-  authenticate,
-  authorize(["admin"]),
-  asyncHandler(GamificationController.awardXP)
-);
-router.put(
-  "/gamification/streak",
-  authenticate,
-  asyncHandler(GamificationController.updateLearningStreak)
-);
-router.get(
-  "/gamification/achievements",
-  asyncHandler(GamificationController.getAvailableAchievements)
-);
-router.post(
-  "/gamification/check-achievements",
-  authenticate,
-  asyncHandler(GamificationController.checkAchievements)
-);
-router.get(
-  "/gamification/xp-history",
-  authenticate,
-  asyncHandler(GamificationController.getXPHistory)
-);
-router.get(
-  "/help/categories",
-  asyncHandler(PeerHelpController.getCategories)
-);
-router.get(
-  "/help/questions",
-  validateRequest({ query: paginationSchema }),
-  asyncHandler(PeerHelpController.getQuestions)
-);
-router.get(
-  "/help/questions/:id",
-  validateRequest({ params: idParamSchema }),
-  asyncHandler(PeerHelpController.getQuestion)
-);
-router.post(
-  "/help/questions",
-  authenticate,
-  validateRequest({ body: createQuestionSchema }),
-  asyncHandler(PeerHelpController.createQuestion)
-);
-router.post(
-  "/help/questions/:questionId/answers",
-  authenticate,
-  validateRequest({ body: createAnswerSchema }),
-  asyncHandler(PeerHelpController.createAnswer)
-);
-router.put(
-  "/help/answers/:answerId/rate",
-  authenticate,
-  asyncHandler(PeerHelpController.rateAnswer)
-);
-router.get(
-  "/help/leaderboard",
-  asyncHandler(PeerHelpController.getHelpLeaderboard)
-);
-router.get(
-  "/help/my-stats",
-  authenticate,
-  asyncHandler(PeerHelpController.getUserHelpStats)
-);
-router.post(
-  "/help/questions/:questionId/vote",
-  authenticate,
-  asyncHandler(PeerHelpController.voteOnQuestion)
-);
-router.post(
-  "/help/answers/:answerId/vote",
-  authenticate,
-  asyncHandler(PeerHelpController.voteOnAnswer)
-);
-router.put(
-  "/help/answers/:answerId/accept",
-  authenticate,
-  asyncHandler(PeerHelpController.acceptAnswer)
-);
-router.get(
-  "/help/search",
-  asyncHandler(PeerHelpController.searchQuestions)
-);
-router.get(
-  "/analytics/user",
-  authenticate,
-  asyncHandler(AnalyticsController.getUserAnalytics)
-);
-router.get(
-  "/analytics/course/:courseId",
-  authenticate,
-  authorize(["instructor", "admin"]),
-  validateRequest({ params: idParamSchema }),
-  asyncHandler(AnalyticsController.getCourseAnalytics)
-);
-router.get(
-  "/analytics/dashboard",
-  authenticate,
-  asyncHandler(AnalyticsController.getDashboardAnalytics)
-);
-router.post(
-  "/analytics/activity",
-  authenticate,
-  asyncHandler(AnalyticsController.recordActivity)
-);
-router.get(
-  "/analytics/progress-report",
-  authenticate,
-  asyncHandler(AnalyticsController.getProgressReport)
-);
-router.get(
-  "/analytics/learning-patterns",
-  authenticate,
-  asyncHandler(AnalyticsController.getLearningPatterns)
-);
-router.post(
-  "/ai/lesson-summary",
-  authenticate,
-  aiLimiter.middleware,
-  asyncHandler(void 0)
-);
-router.post(
-  "/ai/practice-questions",
-  authenticate,
-  aiLimiter.middleware,
-  asyncHandler(void 0)
-);
-router.post(
-  "/ai/study-buddy/chat",
-  authenticate,
-  aiLimiter.middleware,
-  asyncHandler(void 0)
-);
-router.post(
-  "/ai/skill-gap-analysis",
-  authenticate,
-  aiLimiter.middleware,
-  asyncHandler(void 0)
-);
-router.post(
-  "/ai/generate-content",
-  authenticate,
-  authorize(["instructor", "admin"]),
-  aiLimiter.middleware,
-  asyncHandler(void 0)
-);
-router.post(
-  "/ai/analyze-answer/:answerId",
-  authenticate,
-  aiLimiter.middleware,
-  validateRequest({ params: idParamSchema }),
-  asyncHandler(analyzeAnswer)
-);
-router.get(
-  "/ai/skill-analytics/:userId",
-  authenticate,
-  validateRequest({ params: idParamSchema }),
-  asyncHandler(getSkillAnalytics)
-);
-router.post(
-  "/ai/skill-progress",
-  authenticate,
-  asyncHandler(updateSkillProgress)
-);
-router.post(
-  "/ai/missions",
-  authenticate,
-  authorize(["admin"]),
-  asyncHandler(createMission)
-);
-router.get(
-  "/ai/missions/:userId",
-  authenticate,
-  validateRequest({ params: idParamSchema }),
-  asyncHandler(getUserMissions)
-);
-router.post(
-  "/ai/missions/progress",
-  authenticate,
-  asyncHandler(updateMissionProgress)
-);
-router.post(
-  "/ai/missions/claim-reward",
-  authenticate,
-  asyncHandler(claimMissionReward)
-);
-router.get(
-  "/ai/unlock-status/:userId/:unlockType",
-  authenticate,
-  asyncHandler(checkUnlockStatus)
-);
-router.post(
-  "/ai/mentor/:questionId",
-  authenticate,
-  aiLimiter.middleware,
-  validateRequest({ params: idParamSchema }),
-  asyncHandler(triggerAIMentor)
-);
-router.get(
-  "/ai/answer-quality/:userId",
-  authenticate,
-  validateRequest({ params: idParamSchema }),
-  asyncHandler(getAnswerQualityStats)
-);
-router.get(
-  "/admin/stats",
-  authenticate,
-  authorize(["admin"]),
-  asyncHandler(AdminController.getSystemStats)
-);
-router.put(
-  "/admin/users/role",
-  authenticate,
-  authorize(["admin"]),
-  asyncHandler(AdminController.updateUserRole)
-);
-router.put(
-  "/admin/config",
-  authenticate,
-  authorize(["admin"]),
-  asyncHandler(AdminController.updateSystemConfig)
-);
-router.post(
-  "/admin/moderate",
-  authenticate,
-  authorize(["admin"]),
-  asyncHandler(AdminController.moderateContent)
-);
-router.get(
-  "/admin/export-analytics",
-  authenticate,
-  authorize(["admin"]),
-  asyncHandler(AdminController.exportAnalytics)
-);
+var authLimiter2 = generalLimiter;
+router.post("/auth/register", authLimiter2.middleware, asyncHandler(AuthController.register));
+router.post("/auth/login", authLimiter2.middleware, asyncHandler(AuthController.login));
+router.post("/auth/refresh", asyncHandler(AuthController.refreshToken));
+router.post("/auth/logout", authenticateJWT, asyncHandler(AuthController.logout));
+router.post("/auth/forgot-password", authLimiter2.middleware, asyncHandler(AuthController.forgotPassword));
+router.post("/auth/reset-password", authLimiter2.middleware, asyncHandler(AuthController.resetPassword));
+router.get("/auth/verify-email", asyncHandler(EmailController.verifyEmail));
+router.post("/auth/resend-verification", authLimiter2.middleware, asyncHandler(EmailController.resendVerification));
+router.get("/auth/google", AuthController.googleAuth);
+router.get("/auth/google/callback", asyncHandler(AuthController.googleCallback));
+router.get("/auth/me", authenticateJWT, requireAuth, asyncHandler(AuthController.getProfile));
+router.put("/auth/profile", authenticateJWT, requireAuth, asyncHandler(AuthController.updateProfile));
+router.put("/auth/change-password", authenticateJWT, requireAuth, asyncHandler(AuthController.changePassword));
+router.get("/courses", (req, res) => {
+  res.json({
+    success: true,
+    message: "Course endpoints will be restored after authentication system is complete",
+    data: []
+  });
+});
+router.get("/courses/:id", (req, res) => {
+  res.json({
+    success: true,
+    message: "Course details endpoint will be restored after authentication system is complete",
+    data: null
+  });
+});
+router.all("/admin/*", authenticateJWT, requireAdmin, (req, res) => {
+  res.status(503).json({
+    success: false,
+    error: "Admin features will be restored after authentication system integration is complete."
+  });
+});
+router.all("/instructor/*", authenticateJWT, requireInstructor, (req, res) => {
+  res.status(503).json({
+    success: false,
+    error: "Instructor features will be restored after authentication system integration is complete."
+  });
+});
+router.all("/student/*", authenticateJWT, requireAuth, (req, res) => {
+  res.status(503).json({
+    success: false,
+    error: "Student features will be restored after authentication system integration is complete."
+  });
+});
+router.all("/courses/:id/enroll", authenticateJWT, requireAuth, (req, res) => {
+  res.status(503).json({
+    success: false,
+    error: "Course enrollment will be restored after authentication system integration is complete."
+  });
+});
+router.all("/gamification/*", authenticateJWT, requireAuth, (req, res) => {
+  res.status(503).json({
+    success: false,
+    error: "Gamification features will be restored after authentication system integration is complete."
+  });
+});
+router.all("/peer-help/*", (req, res) => {
+  res.status(503).json({
+    success: false,
+    error: "Peer help features will be restored after authentication system integration is complete."
+  });
+});
+router.all("/ai/*", authenticateJWT, requireAuth, (req, res) => {
+  res.status(503).json({
+    success: false,
+    error: "AI features will be restored after authentication system integration is complete."
+  });
+});
+router.all("/video/*", authenticateJWT, requireAuth, (req, res) => {
+  res.status(503).json({
+    success: false,
+    error: "Video features will be restored after authentication system integration is complete."
+  });
+});
+router.all("*", (req, res) => {
+  if (req.path.startsWith("/api/")) {
+    res.status(404).json({
+      success: false,
+      error: "API endpoint not found"
+    });
+  } else {
+    res.status(404).json({
+      success: false,
+      error: "Route not found"
+    });
+  }
+});
 
 // server/vite.ts
 import express2 from "express";
@@ -4507,6 +3270,55 @@ function log(message, source = "express") {
   });
   console.log(`${formattedTime} [${source}] ${message}`);
 }
+async function setupVite(app2, server) {
+  const serverOptions = {
+    middlewareMode: true,
+    hmr: { server },
+    allowedHosts: [
+      "replit.app",
+      "replit.dev",
+      "localhost",
+      /.*\.replit\.dev$/,
+      /.*\.kirk\.replit\.dev$/,
+      /.*\.spock\.replit\.dev$/
+    ]
+  };
+  const vite = await createViteServer({
+    ...vite_config_default,
+    configFile: false,
+    customLogger: {
+      ...viteLogger,
+      error: (msg, options) => {
+        viteLogger.error(msg, options);
+        process.exit(1);
+      }
+    },
+    server: serverOptions,
+    appType: "custom"
+  });
+  app2.use(vite.middlewares);
+  app2.use("*", async (req, res, next) => {
+    const url = req.originalUrl;
+    try {
+      const clientTemplate = path3.resolve(
+        import.meta.dirname,
+        "..",
+        "client",
+        "index.html"
+      );
+      let template = await fs2.promises.readFile(clientTemplate, "utf-8");
+      template = template.replace(
+        `src="/src/main.tsx"`,
+        `src="/src/main.tsx?v=${nanoid()}"`
+      );
+      const page = await vite.transformIndexHtml(url, template);
+      res.status(200).set({ "Content-Type": "text/html" }).end(page);
+    } catch (e) {
+      vite.ssrFixStacktrace(e);
+      next(e);
+    }
+  });
+}
 function serveStatic(app2) {
   const distPath = path3.resolve(import.meta.dirname, "public");
   if (!fs2.existsSync(distPath)) {
@@ -4521,11 +3333,117 @@ function serveStatic(app2) {
 }
 
 // server/index.ts
+init_logger();
 import cors from "cors";
+
+// server/config/passport.ts
+import passport2 from "passport";
+import { Strategy as LocalStrategy } from "passport-local";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+init_auth();
+init_logger();
+passport2.serializeUser((user, done) => {
+  done(null, user);
+});
+passport2.deserializeUser((user, done) => {
+  done(null, user);
+});
+passport2.use(new LocalStrategy(
+  {
+    usernameField: "email",
+    // Use email instead of username
+    passwordField: "password",
+    session: false
+    // Disable sessions, use JWT instead
+  },
+  async (email, password, done) => {
+    try {
+      const user = await AuthStorage.getUserByEmail(email.toLowerCase().trim());
+      if (!user) {
+        return done(null, false, { message: "Invalid email or password" });
+      }
+      if (!user.passwordHash) {
+        return done(null, false, { message: "Please sign in with Google" });
+      }
+      const isValidPassword = await comparePassword(password, user.passwordHash);
+      if (!isValidPassword) {
+        return done(null, false, { message: "Invalid email or password" });
+      }
+      await AuthStorage.updateLastActivity(user.id);
+      const { passwordHash, ...safeUser } = user;
+      return done(null, safeUser);
+    } catch (error) {
+      logger.error("Local strategy error:", error);
+      return done(error);
+    }
+  }
+));
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  passport2.use(new GoogleStrategy(
+    {
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: process.env.OAUTH_CALLBACK_URL || "/api/auth/google/callback"
+    },
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        const googleId = profile.id;
+        const email = profile.emails?.[0]?.value;
+        const name = profile.displayName || profile.name?.givenName + " " + profile.name?.familyName;
+        const imageUrl = profile.photos?.[0]?.value;
+        if (!email) {
+          return done(new Error("No email found in Google profile"), void 0);
+        }
+        logger.info("Google OAuth - Processing user:", { email, googleId, name });
+        let user = await AuthStorage.getUserByProviderId("google", googleId);
+        if (user) {
+          await AuthStorage.updateLastActivity(user.id);
+          logger.info("Google OAuth - Existing Google user logged in:", { userId: user.id, email: user.email });
+        } else {
+          user = await AuthStorage.getUserByEmail(email.toLowerCase().trim());
+          if (user) {
+            user = await AuthStorage.linkProvider(user.id, "google", googleId);
+            logger.info("Google OAuth - Linked Google account to existing user:", { userId: user.id, email: user.email });
+          } else {
+            user = await AuthStorage.createUser({
+              email: email.toLowerCase().trim(),
+              name: name || email.split("@")[0],
+              imageUrl: imageUrl || null,
+              provider: "google",
+              providerId: googleId,
+              emailVerifiedAt: /* @__PURE__ */ new Date(),
+              // Google emails are pre-verified
+              role: "student"
+              // Default role
+            });
+            logger.info("Google OAuth - Created new user from Google:", { userId: user.id, email: user.email });
+          }
+        }
+        const { passwordHash, ...safeUser } = user;
+        return done(null, safeUser);
+      } catch (error) {
+        logger.error("Google OAuth strategy error:", error);
+        return done(error);
+      }
+    }
+  ));
+} else {
+  console.log("Google OAuth not configured - skipping Google strategy initialization");
+}
+var passport_default = passport2;
+
+// server/index.ts
+import cookieParser from "cookie-parser";
 var app = express3();
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || "http://localhost:5000",
+  credentials: true
+  // Enable cookies for authentication
+}));
 app.use(express3.json({ limit: "10mb" }));
 app.use(express3.urlencoded({ extended: false, limit: "10mb" }));
+app.use(cookieParser());
+app.use(passport_default.initialize());
 app.use((req, res, next) => {
   const start = Date.now();
   const path4 = req.path;
@@ -4556,7 +3474,11 @@ app.use("/api", notFound);
 (async () => {
   app.use(errorHandler);
   const server = createServer(app);
-  serveStatic(app);
+  if (process.env.NODE_ENV === "production") {
+    serveStatic(app);
+  } else {
+    await setupVite(app, server);
+  }
   const port = 5e3;
   server.listen(port, "0.0.0.0", () => {
     console.log(`[express] serving on port ${port}`);
