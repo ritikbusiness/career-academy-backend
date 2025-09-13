@@ -314,6 +314,10 @@ export class AuthController {
 
   // Google OAuth redirect
   static googleAuth(req: Request, res: Response, next: NextFunction): void {
+    logger.info('Google OAuth redirect initiated', {
+      callbackUrl: process.env.OAUTH_CALLBACK_URL,
+      clientId: process.env.GOOGLE_CLIENT_ID ? `${process.env.GOOGLE_CLIENT_ID.substring(0, 20)}...` : 'NOT SET'
+    });
     passport.authenticate('google', {
       scope: ['profile', 'email'],
       prompt: 'select_account' // Force Google account selection
