@@ -122,6 +122,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initAuth();
   }, []);
 
+  // Clear any cached test data with john@example.com
+  useEffect(() => {
+    const clearTestData = () => {
+      try {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          const userData = JSON.parse(storedUser);
+          if (userData.email === 'john@example.com') {
+            localStorage.removeItem('user');
+            localStorage.removeItem('accessToken');
+            console.log('Cleared cached test user data');
+          }
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    };
+    clearTestData();
+  }, []);
+
   const login = async (email: string, password: string): Promise<void> => {
     setAuthState(prev => ({ ...prev, isLoading: true }));
     
