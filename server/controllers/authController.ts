@@ -148,14 +148,21 @@ export class AuthController {
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
       });
       
-      const emailSent = await sendVerificationEmail(user.email, user.name, emailToken);
+      // Handle local email system response (can be boolean or EmailResult object)
+      const emailResult = await sendVerificationEmail(user.email, user.name, emailToken);
       const emailDuration = Date.now() - emailStartTime;
+      
+      // Extract success status from result (handle both boolean and object responses)
+      const emailSent = typeof emailResult === 'boolean' ? emailResult : emailResult.success;
+      const testData = typeof emailResult === 'object' && emailResult.testData ? emailResult.testData : undefined;
       
       if (!emailSent) {
         logger.warn(`[${requestId}] Email verification failed to send`, { email: user.email });
       }
       
-      logger.info(`[${requestId}] Email verification ${emailSent ? 'sent' : 'failed'} (${emailDuration}ms)`);
+      logger.info(`[${requestId}] Email verification ${emailSent ? 'sent' : 'failed'} (${emailDuration}ms)`, {
+        hasTestData: !!testData
+      });
 
       // Step 12: Send successful response
       const totalDuration = Date.now() - startTime;
@@ -174,14 +181,22 @@ export class AuthController {
         }
       });
 
+      // Build response data
+      const responseData: any = {
+        user: sanitizeUserData(user),
+        accessToken,
+        emailVerificationSent: emailSent
+      };
+      
+      // Include test data in non-production environments for debugging
+      if (testData && process.env.NODE_ENV !== 'production') {
+        responseData.testData = testData;
+      }
+
       res.status(201).json({
         success: true,
         message: 'User registered successfully. Please check your email to verify your account.',
-        data: {
-          user: sanitizeUserData(user),
-          accessToken,
-          emailVerificationSent: emailSent
-        }
+        data: responseData
       });
     } catch (error) {
       const totalDuration = Date.now() - startTime;
@@ -557,6 +572,7 @@ export class AuthController {
 
       // Check if user exists (but don't reveal this for security)
       const user = await AuthStorage.getUserByEmail(normalizedEmail);
+      let testData: any = undefined; // Declare testData at function scope
       
       if (user && user.passwordHash) {
         // Generate reset token
@@ -570,30 +586,38 @@ export class AuthController {
           expiresAt
         });
         
-        // Send password reset email
-        const emailSent = await sendPasswordResetEmail(user.email, user.name, resetToken);
+        // Send password reset email using local testing system
+        const emailResult = await sendPasswordResetEmail(user.email, user.name, resetToken);
+        
+        // Extract success status from result (handle both boolean and object responses)
+        const emailSent = typeof emailResult === 'boolean' ? emailResult : emailResult.success;
+        testData = typeof emailResult === 'object' && emailResult.testData ? emailResult.testData : undefined;
         
         logger.info('Password reset requested', { 
           userId: user.id, 
           email: user.email, 
-          emailSent 
+          emailSent,
+          hasTestData: !!testData
         });
         
         if (!emailSent) {
           logger.warn('Password reset email failed to send', { email: user.email });
         }
-        
-        // For development debugging only
-        if (process.env.NODE_ENV === 'development') {
-          logger.info('Password reset token (DEVELOPMENT ONLY):', { resetToken, email: user.email });
-        }
       }
       
       // Always return success to prevent user enumeration
-      res.json({
+      // In testing environments, include test data for easier debugging
+      const responseData: any = {
         success: true,
         message: 'If an account with that email exists, a password reset link has been sent'
-      });
+      };
+      
+      // Include test data in non-production environments for debugging (if user exists)
+      if (user && testData && process.env.NODE_ENV !== 'production') {
+        responseData.testData = testData;
+      }
+      
+      res.json(responseData);
     } catch (error) {
       logger.error('Forgot password error:', error);
       res.status(500).json({
