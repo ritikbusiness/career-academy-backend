@@ -2,10 +2,11 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 
+import { config } from './config';
+
 // Bcrypt utilities
 export const hashPassword = async (password: string): Promise<string> => {
-  const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12');
-  return await bcrypt.hash(password, saltRounds);
+  return await bcrypt.hash(password, config.BCRYPT_SALT_ROUNDS);
 };
 
 export const comparePassword = async (password: string, hash: string): Promise<boolean> => {
@@ -29,12 +30,7 @@ export interface RefreshTokenPayload {
 }
 
 export const generateAccessToken = (payload: Omit<JWTPayload, 'iat' | 'exp'>): string => {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error('JWT_SECRET environment variable is required');
-  }
-  
-  return jwt.sign(payload, secret, {
+  return jwt.sign(payload, config.JWT_SECRET, {
     expiresIn: '15m', // Short-lived access token
     issuer: 'lms-auth',
     audience: 'lms-api'
@@ -42,18 +38,13 @@ export const generateAccessToken = (payload: Omit<JWTPayload, 'iat' | 'exp'>): s
 };
 
 export const generateRefreshToken = (userId: number): { token: string; jti: string } => {
-  const secret = process.env.JWT_REFRESH_SECRET;
-  if (!secret) {
-    throw new Error('JWT_REFRESH_SECRET environment variable is required');
-  }
-  
   const jti = randomUUID(); // Unique token identifier
   const payload: Omit<RefreshTokenPayload, 'iat' | 'exp'> = {
     userId,
     jti
   };
   
-  const token = jwt.sign(payload, secret, {
+  const token = jwt.sign(payload, config.JWT_REFRESH_SECRET, {
     expiresIn: '7d', // Long-lived refresh token
     issuer: 'lms-auth',
     audience: 'lms-api'
@@ -63,13 +54,8 @@ export const generateRefreshToken = (userId: number): { token: string; jti: stri
 };
 
 export const verifyAccessToken = (token: string): JWTPayload => {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error('JWT_SECRET environment variable is required');
-  }
-  
   try {
-    const payload = jwt.verify(token, secret, {
+    const payload = jwt.verify(token, config.JWT_SECRET, {
       issuer: 'lms-auth',
       audience: 'lms-api'
     }) as JWTPayload;
@@ -86,13 +72,8 @@ export const verifyAccessToken = (token: string): JWTPayload => {
 };
 
 export const verifyRefreshToken = (token: string): RefreshTokenPayload => {
-  const secret = process.env.JWT_REFRESH_SECRET;
-  if (!secret) {
-    throw new Error('JWT_REFRESH_SECRET environment variable is required');
-  }
-  
   try {
-    const payload = jwt.verify(token, secret, {
+    const payload = jwt.verify(token, config.JWT_REFRESH_SECRET, {
       issuer: 'lms-auth',
       audience: 'lms-api'
     }) as RefreshTokenPayload;
