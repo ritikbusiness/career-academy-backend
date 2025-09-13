@@ -122,52 +122,44 @@ export const validateEmail = (email: string): boolean => {
     return false;
   }
 
-  // Extract domain
+  // Extract local part and domain
+  const localPart = email.split('@')[0]?.toLowerCase();
   const domain = email.split('@')[1]?.toLowerCase();
-  if (!domain) {
+  
+  if (!localPart || !domain) {
     return false;
   }
 
-  // Prevent obvious fake patterns
-  const suspiciousPatterns = [
-    /^[a-z]{1,4}$/, // Very short random letters like "asdf"
-    /^test\d*$/, // "test", "test1", "test123"
-    /^fake/i, // Starts with "fake"
-    /^dummy/i, // Starts with "dummy" 
-    /^\d+$/, // Only numbers
-    /^[xyz]+$/, // Only x, y, z
-    /^[qwerty]+$/, // Keyboard mashing
-    /^temp/i, // Temporary
-    /^invalid/i, // Obviously invalid
+  // Block only specific known fake patterns (very targeted)
+  const exactFakePatterns = [
+    'asdf', 'qwerty', 'zxcv', 'abcd', 'wxyz',  // Exact keyboard patterns
+    'test', 'fake', 'dummy', 'invalid', 'temp', // Exact obvious fakes
   ];
 
-  const localPart = email.split('@')[0]?.toLowerCase();
-  if (localPart && suspiciousPatterns.some(pattern => pattern.test(localPart))) {
+  // Block exact matches and test with numbers (test123, fake1, etc.)
+  if (exactFakePatterns.includes(localPart) || 
+      exactFakePatterns.some(pattern => localPart.startsWith(pattern) && /^\d+$/.test(localPart.slice(pattern.length)))) {
     return false;
   }
 
-  // Block suspicious domains
+  // Block all-numeric local parts (12345@domain.com)
+  if (/^\d+$/.test(localPart)) {
+    return false;
+  }
+
+  // Block suspicious domains (disposable email providers)
   const suspiciousDomains = [
-    'test.com', 'fake.com', 'invalid.com', 'dummy.com',
-    'temp.com', 'throwaway.email', '10minutemail.com'
+    'test.com', 'fake.com', 'invalid.com', 'dummy.com', 'temp.com',
+    'throwaway.email', '10minutemail.com', 'mailinator.com', 'guerrillamail.com',
+    'yopmail.com', 'tempmail.org', 'dispostable.com'
   ];
 
   if (suspiciousDomains.includes(domain)) {
     return false;
   }
 
-  // Require legitimate TLD (top-level domain)
-  const legitimateTlds = [
-    'com', 'org', 'net', 'edu', 'gov', 'mil', 'int',
-    'co.uk', 'co.in', 'co.au', 'ca', 'de', 'fr', 'jp',
-    'br', 'ru', 'cn', 'in', 'uk', 'au', 'mx', 'es',
-    'it', 'nl', 'pl', 'se', 'no', 'dk', 'fi', 'be'
-  ];
-
-  const tld = domain.includes('.') ? domain.split('.').slice(-1)[0] : domain;
-  const fullTld = domain.includes('.') ? domain.split('.').slice(-2).join('.') : domain;
-
-  if (!legitimateTlds.includes(tld) && !legitimateTlds.includes(fullTld)) {
+  // Basic domain structure check (must have at least one dot and contain letters)
+  if (!domain.includes('.') || !/[a-z]/.test(domain)) {
     return false;
   }
 
