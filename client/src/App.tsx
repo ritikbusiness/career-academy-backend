@@ -17,6 +17,9 @@ import NotFound from './pages/NotFound';
 import Unauthorized from './pages/Unauthorized';
 import LoginForm from './components/auth/LoginForm';
 import SignupForm from './components/auth/SignupForm';
+import ForgotPasswordForm from './components/auth/ForgotPasswordForm';
+import ResetPasswordForm from './components/auth/ResetPasswordForm';
+import EmailVerificationForm from './components/auth/EmailVerificationForm';
 import InstructorSignupWithToken from './components/auth/InstructorSignupWithToken';
 import OnboardingForm from './components/auth/OnboardingForm';
 import GoogleAuthSuccess from './pages/auth/GoogleAuthSuccess';
@@ -41,8 +44,11 @@ function App() {
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<LoginForm />} />
               <Route path="/signup" element={<SignupForm />} />
+              <Route path="/forgot-password" element={<ForgotPasswordForm />} />
+              <Route path="/reset-password" element={<ResetPasswordForm />} />
+              <Route path="/verify-email" element={<EmailVerificationForm />} />
               <Route path="/instructor-signup" element={<InstructorSignupWithToken />} />
-              <Route path="/auth/google/success" element={<GoogleAuthSuccess />} />
+              <Route path="/auth/google-success" element={<GoogleAuthSuccess />} />
               <Route path="/onboarding" element={<OnboardingForm />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/courses" element={<StudentCourses />} />

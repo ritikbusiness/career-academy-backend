@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle } from 'lucide-react';
 
 const SignupForm = () => {
   const [formData, setFormData] = useState({
@@ -35,10 +35,25 @@ const SignupForm = () => {
       return;
     }
 
-    if (formData.password.length < 8) {
+    // Enhanced password validation
+    const passwordErrors: string[] = [];
+    
+    if (formData.password.length < 6) {
+      passwordErrors.push('Password must be at least 6 characters long');
+    }
+    
+    if (!/\d/.test(formData.password)) {
+      passwordErrors.push('Password must contain at least one number');
+    }
+    
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(formData.password)) {
+      passwordErrors.push('Password must contain at least one symbol');
+    }
+    
+    if (passwordErrors.length > 0) {
       toast({
-        title: "Password too short",
-        description: "Password must be at least 8 characters long.",
+        title: "Password requirements not met",
+        description: passwordErrors.join('. '),
         variant: "destructive",
       });
       return;
@@ -51,7 +66,9 @@ const SignupForm = () => {
       
       toast({
         title: "Account created successfully",
-        description: `Welcome to Desired Career Academy as a ${formData.role}!`,
+        description: data.data.emailVerificationSent 
+          ? "Please check your email to verify your account and unlock all features." 
+          : `Welcome to Desired Career Academy as a ${formData.role}!`,
       });
       
       navigate('/dashboard');
@@ -158,12 +175,12 @@ const SignupForm = () => {
                   id="password"
                   name="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Create a password (min 8 characters)"
+                  placeholder="Create a password (min 6 chars, include numbers & symbols)"
                   value={formData.password}
                   onChange={handleInputChange}
                   required
                   disabled={isLoading}
-                  minLength={8}
+                  minLength={6}
                   className="pr-10"
                 />
                 <button
@@ -175,6 +192,24 @@ const SignupForm = () => {
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              
+              {/* Password Requirements Indicator */}
+              {formData.password.length > 0 && (
+                <div className="text-xs space-y-1">
+                  <div className={`flex items-center ${formData.password.length >= 6 ? 'text-green-600' : 'text-gray-500'}`}>
+                    <CheckCircle className={`w-3 h-3 mr-1 ${formData.password.length >= 6 ? 'text-green-600' : 'text-gray-300'}`} />
+                    At least 6 characters
+                  </div>
+                  <div className={`flex items-center ${/\d/.test(formData.password) ? 'text-green-600' : 'text-gray-500'}`}>
+                    <CheckCircle className={`w-3 h-3 mr-1 ${/\d/.test(formData.password) ? 'text-green-600' : 'text-gray-300'}`} />
+                    Contains a number
+                  </div>
+                  <div className={`flex items-center ${/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(formData.password) ? 'text-green-600' : 'text-gray-500'}`}>
+                    <CheckCircle className={`w-3 h-3 mr-1 ${/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(formData.password) ? 'text-green-600' : 'text-gray-300'}`} />
+                    Contains a symbol
+                  </div>
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm Password</Label>
@@ -188,7 +223,7 @@ const SignupForm = () => {
                   onChange={handleInputChange}
                   required
                   disabled={isLoading}
-                  minLength={8}
+                  minLength={6}
                   className="pr-10"
                 />
                 <button
