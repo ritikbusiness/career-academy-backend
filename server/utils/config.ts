@@ -20,8 +20,8 @@ const envSchema = z.object({
   SESSION_SECRET: z.string().optional(),
   
   // Google OAuth
-  GOOGLE_CLIENT_ID: z.string().optional(),
-  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_CLIENT_ID: z.string().min(1, 'GOOGLE_CLIENT_ID is required for OAuth').optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(1, 'GOOGLE_CLIENT_SECRET is required for OAuth').optional(),
   OAUTH_CALLBACK_URL: z.string().url().default('http://localhost:5000/api/auth/google/callback'),
   
   // Cookies

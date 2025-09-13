@@ -32,6 +32,10 @@ router.post('/auth/login', authLimiter.middleware, asyncHandler(AuthController.l
 router.post('/auth/refresh', asyncHandler(AuthController.refreshToken));
 router.post('/auth/logout', authenticateJWT, asyncHandler(AuthController.logout));
 
+// Password reset routes
+router.post('/auth/forgot-password', authLimiter.middleware, asyncHandler(AuthController.forgotPassword));
+router.post('/auth/reset-password', authLimiter.middleware, asyncHandler(AuthController.resetPassword));
+
 // Google OAuth routes
 router.get('/auth/google', AuthController.googleAuth);
 router.get('/auth/google/callback', asyncHandler(AuthController.googleCallback));

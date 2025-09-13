@@ -183,6 +183,11 @@ export const generateSecureToken = (): string => {
   return randomUUID();
 };
 
+// Generate a secure password reset token
+export const generatePasswordResetToken = (): string => {
+  return randomUUID() + '-' + Date.now();
+};
+
 export const sanitizeUserData = (user: any) => {
   const { passwordHash, ...safeUser } = user;
   return safeUser;

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import passport from 'passport';
 import { AuthStorage } from '../storage/authStorage';
-import { hashPassword, generateAccessToken, generateRefreshToken, verifyRefreshToken, getCookieOptions, validateEmail, validatePassword, sanitizeUserData } from '../utils/auth';
+import { hashPassword, generateAccessToken, generateRefreshToken, verifyRefreshToken, getCookieOptions, validateEmail, validatePassword, sanitizeUserData, generateSecureToken } from '../utils/auth';
 import { AUTH_ERRORS, createSuccessResponse, ERROR_CODES } from '../utils/errors';
 import { registerSchema, loginSchema, changePasswordSchema, updateProfileSchema } from '@shared/schema';
 import { logger } from '../utils/logger';
@@ -217,8 +217,8 @@ export class AuthController {
         // Set refresh token as httpOnly cookie
         res.cookie('refreshToken', refreshToken, getCookieOptions());
 
-        // Redirect to frontend with success
-        res.redirect(`${process.env.FRONTEND_URL}/auth/success?token=${accessToken}`);
+        // Redirect to frontend Google OAuth success page
+        res.redirect(`${process.env.FRONTEND_URL}/auth/google-success`);
       } catch (tokenError) {
         logger.error('Google OAuth token generation error:', tokenError);
         res.redirect(`${process.env.FRONTEND_URL}/auth/error?message=token_generation_failed`);
@@ -400,6 +400,125 @@ export class AuthController {
       res.status(500).json({
         success: false,
         error: 'Failed to update profile'
+      });
+    }
+  }
+
+  // Forgot password - request reset email
+  static async forgotPassword(req: Request, res: Response): Promise<void> {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        res.status(400).json({
+          success: false,
+          error: 'Email is required',
+          code: ERROR_CODES.VALIDATION_ERROR
+        });
+        return;
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+      
+      if (!validateEmail(normalizedEmail)) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid email format',
+          code: ERROR_CODES.INVALID_EMAIL
+        });
+        return;
+      }
+
+      // Check if user exists (but don't reveal this for security)
+      const user = await AuthStorage.getUserByEmail(normalizedEmail);
+      
+      if (user && user.passwordHash) {
+        // Generate reset token
+        const resetToken = generateSecureToken();
+        const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+        
+        // Store reset token
+        await AuthStorage.createPasswordResetToken({
+          userId: user.id,
+          token: resetToken,
+          expiresAt
+        });
+        
+        // TODO: Send email with reset link
+        logger.info('Password reset requested', { userId: user.id, email: user.email });
+        
+        // For now, log the reset token (in production, this should be sent via email)
+        logger.info('Password reset token (DEVELOPMENT ONLY):', { resetToken, email: user.email });
+      }
+      
+      // Always return success to prevent user enumeration
+      res.json({
+        success: true,
+        message: 'If an account with that email exists, a password reset link has been sent'
+      });
+    } catch (error) {
+      logger.error('Forgot password error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to process password reset request'
+      });
+    }
+  }
+
+  // Reset password with token
+  static async resetPassword(req: Request, res: Response): Promise<void> {
+    try {
+      const { token, newPassword } = req.body;
+      
+      if (!token || !newPassword) {
+        res.status(400).json({
+          success: false,
+          error: 'Reset token and new password are required'
+        });
+        return;
+      }
+
+      // Validate new password
+      const passwordValidation = validatePassword(newPassword);
+      if (!passwordValidation.isValid) {
+        res.status(400).json(AUTH_ERRORS.weakPassword(passwordValidation.errors));
+        return;
+      }
+
+      // Find and verify reset token
+      const resetRecord = await AuthStorage.findPasswordResetToken(token);
+      if (!resetRecord || resetRecord.expiresAt < new Date()) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid or expired reset token',
+          code: ERROR_CODES.INVALID_TOKEN
+        });
+        return;
+      }
+
+      // Hash new password
+      const newPasswordHash = await hashPassword(newPassword);
+      
+      // Update password
+      await AuthStorage.updatePassword(resetRecord.userId, newPasswordHash);
+      
+      // Delete used reset token
+      await AuthStorage.deletePasswordResetToken(token);
+      
+      // Revoke all existing refresh tokens for security
+      await AuthStorage.revokeAllUserRefreshTokens(resetRecord.userId);
+      
+      logger.info('Password reset successful', { userId: resetRecord.userId });
+      
+      res.json({
+        success: true,
+        message: 'Password has been reset successfully. Please log in with your new password.'
+      });
+    } catch (error) {
+      logger.error('Reset password error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to reset password'
       });
     }
   }

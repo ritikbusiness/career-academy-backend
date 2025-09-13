@@ -119,11 +119,43 @@ export class AuthStorage {
       .where(eq(users.id, userId));
   }
 
+  static async revokeAllUserRefreshTokens(userId: number): Promise<void> {
+    await db.update(refreshTokens)
+      .set({ revoked: true })
+      .where(eq(refreshTokens.userId, userId));
+  }
+
   static async deleteUser(userId: number): Promise<void> {
     // First revoke all refresh tokens
     await this.revokeAllUserRefreshTokens(userId);
     
     // Then delete the user (this will cascade to refresh tokens due to foreign key)
     await db.delete(users).where(eq(users.id, userId));
+  }
+
+  // Password reset token operations (using in-memory storage for now)
+  private static passwordResetTokens = new Map<string, { userId: number; expiresAt: Date }>();
+
+  static async createPasswordResetToken(data: { userId: number; token: string; expiresAt: Date }): Promise<void> {
+    this.passwordResetTokens.set(data.token, { userId: data.userId, expiresAt: data.expiresAt });
+  }
+
+  static async findPasswordResetToken(token: string): Promise<{ userId: number; expiresAt: Date } | null> {
+    const tokenData = this.passwordResetTokens.get(token);
+    if (!tokenData) {
+      return null;
+    }
+    
+    // Check if expired
+    if (tokenData.expiresAt < new Date()) {
+      this.passwordResetTokens.delete(token);
+      return null;
+    }
+    
+    return tokenData;
+  }
+
+  static async deletePasswordResetToken(token: string): Promise<void> {
+    this.passwordResetTokens.delete(token);
   }
 }
