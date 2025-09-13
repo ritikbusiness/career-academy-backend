@@ -189,31 +189,26 @@ const COMMON_PASSWORDS = new Set([
 export const validatePassword = (password: string): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
   
-  if (password.length < 8) {
-    errors.push('Password must be at least 8 characters long');
+  // Minimum length requirement (reduced from 8 to 6 as per user request)
+  if (password.length < 6) {
+    errors.push('Password must be at least 6 characters long');
   }
   
   if (password.length > 128) {
     errors.push('Password must be less than 128 characters');
   }
   
-  if (!/[a-z]/.test(password)) {
-    errors.push('Password must contain at least one lowercase letter');
-  }
-  
-  if (!/[A-Z]/.test(password)) {
-    errors.push('Password must contain at least one uppercase letter');
-  }
-  
+  // Must contain at least one number
   if (!/\d/.test(password)) {
     errors.push('Password must contain at least one number');
   }
   
+  // Must contain at least one symbol/special character
   if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-    errors.push('Password must contain at least one special character (!@#$%^&*...)');
+    errors.push('Password must contain at least one symbol (!@#$%^&*...)');
   }
   
-  // Check against common passwords (case insensitive)
+  // Optional: Check against common passwords (case insensitive)
   if (COMMON_PASSWORDS.has(password.toLowerCase())) {
     errors.push('Password is too common. Please choose a more unique password');
   }

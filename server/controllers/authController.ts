@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import passport from 'passport';
 import { AuthStorage } from '../storage/authStorage';
 import { hashPassword, generateAccessToken, generateRefreshToken, verifyRefreshToken, getCookieOptions, validateEmail, validatePassword, sanitizeUserData, generateSecureToken } from '../utils/auth';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/email';
 import { AUTH_ERRORS, createSuccessResponse, ERROR_CODES } from '../utils/errors';
 import { registerSchema, loginSchema, changePasswordSchema, updateProfileSchema } from '@shared/schema';
 import { logger } from '../utils/logger';
@@ -135,27 +136,51 @@ export class AuthController {
       res.cookie('refreshToken', refreshToken, getCookieOptions());
       logger.info(`[${requestId}] Refresh token cookie set`);
 
-      // Step 11: Send successful response
+      // Step 11: Send email verification
+      logger.info(`[${requestId}] Step 11: Sending email verification`);
+      const emailStartTime = Date.now();
+      const emailToken = generateSecureToken();
+      
+      // Store email verification token (expires in 24 hours)
+      await AuthStorage.createEmailVerificationToken({
+        userId: user.id,
+        token: emailToken,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+      });
+      
+      const emailSent = await sendVerificationEmail(user.email, user.name, emailToken);
+      const emailDuration = Date.now() - emailStartTime;
+      
+      if (!emailSent) {
+        logger.warn(`[${requestId}] Email verification failed to send`, { email: user.email });
+      }
+      
+      logger.info(`[${requestId}] Email verification ${emailSent ? 'sent' : 'failed'} (${emailDuration}ms)`);
+
+      // Step 12: Send successful response
       const totalDuration = Date.now() - startTime;
       logger.info(`[${requestId}] Registration completed successfully`, {
         userId: user.id,
         email: user.email,
+        emailVerificationSent: emailSent,
         totalDurationMs: totalDuration,
         performance: {
           validation: 'N/A',
           passwordHashing: `${hashDuration}ms`,
           databaseInsert: `${dbDuration}ms`,
           tokenGeneration: `${tokenDuration}ms`,
-          refreshTokenStorage: `${refreshDuration}ms`
+          refreshTokenStorage: `${refreshDuration}ms`,
+          emailSending: `${emailDuration}ms`
         }
       });
 
       res.status(201).json({
         success: true,
-        message: 'User registered successfully',
+        message: 'User registered successfully. Please check your email to verify your account.',
         data: {
           user: sanitizeUserData(user),
-          accessToken
+          accessToken,
+          emailVerificationSent: emailSent
         }
       });
     } catch (error) {
@@ -545,11 +570,23 @@ export class AuthController {
           expiresAt
         });
         
-        // TODO: Send email with reset link
-        logger.info('Password reset requested', { userId: user.id, email: user.email });
+        // Send password reset email
+        const emailSent = await sendPasswordResetEmail(user.email, user.name, resetToken);
         
-        // For now, log the reset token (in production, this should be sent via email)
-        logger.info('Password reset token (DEVELOPMENT ONLY):', { resetToken, email: user.email });
+        logger.info('Password reset requested', { 
+          userId: user.id, 
+          email: user.email, 
+          emailSent 
+        });
+        
+        if (!emailSent) {
+          logger.warn('Password reset email failed to send', { email: user.email });
+        }
+        
+        // For development debugging only
+        if (process.env.NODE_ENV === 'development') {
+          logger.info('Password reset token (DEVELOPMENT ONLY):', { resetToken, email: user.email });
+        }
       }
       
       // Always return success to prevent user enumeration

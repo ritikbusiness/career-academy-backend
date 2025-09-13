@@ -1,6 +1,7 @@
 import express from 'express';
 import * as AIController from './controllers/aiController';
 import { AuthController } from './controllers/authController';
+import { EmailController } from './controllers/emailController';
 import { authenticateJWT, requireAuth, requireAdmin, requireInstructor } from './middleware/auth';
 import { generalLimiter, aiLimiter } from './middleware/rateLimiter';
 import { asyncHandler } from './middleware/errorHandler';
@@ -35,6 +36,10 @@ router.post('/auth/logout', authenticateJWT, asyncHandler(AuthController.logout)
 // Password reset routes
 router.post('/auth/forgot-password', authLimiter.middleware, asyncHandler(AuthController.forgotPassword));
 router.post('/auth/reset-password', authLimiter.middleware, asyncHandler(AuthController.resetPassword));
+
+// Email verification routes
+router.get('/auth/verify-email', asyncHandler(EmailController.verifyEmail));
+router.post('/auth/resend-verification', authLimiter.middleware, asyncHandler(EmailController.resendVerification));
 
 // Google OAuth routes
 router.get('/auth/google', AuthController.googleAuth);

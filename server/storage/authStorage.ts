@@ -130,6 +130,9 @@ export class AuthStorage {
 
   // Password reset token operations (using in-memory storage for now)
   private static passwordResetTokens = new Map<string, { userId: number; expiresAt: Date }>();
+  
+  // Email verification token operations (using in-memory storage for now)
+  private static emailVerificationTokens = new Map<string, { userId: number; expiresAt: Date }>();
 
   static async createPasswordResetToken(data: { userId: number; token: string; expiresAt: Date }): Promise<void> {
     this.passwordResetTokens.set(data.token, { userId: data.userId, expiresAt: data.expiresAt });
@@ -152,5 +155,33 @@ export class AuthStorage {
 
   static async deletePasswordResetToken(token: string): Promise<void> {
     this.passwordResetTokens.delete(token);
+  }
+
+  // Email verification token operations
+  static async createEmailVerificationToken(data: { userId: number; token: string; expiresAt: Date }): Promise<void> {
+    this.emailVerificationTokens.set(data.token, { userId: data.userId, expiresAt: data.expiresAt });
+  }
+
+  static async findEmailVerificationToken(token: string): Promise<{ userId: number; expiresAt: Date } | null> {
+    const tokenData = this.emailVerificationTokens.get(token);
+    if (!tokenData) {
+      return null;
+    }
+    
+    // Check if expired
+    if (tokenData.expiresAt < new Date()) {
+      this.emailVerificationTokens.delete(token);
+      return null;
+    }
+    
+    return tokenData;
+  }
+
+  static async deleteEmailVerificationToken(token: string): Promise<void> {
+    this.emailVerificationTokens.delete(token);
+  }
+
+  static async verifyUserEmail(userId: number): Promise<void> {
+    await this.markEmailAsVerified(userId);
   }
 }
