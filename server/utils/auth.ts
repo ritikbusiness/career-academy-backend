@@ -116,8 +116,62 @@ export const getCookieOptions = (maxAge?: number) => {
 
 // Validation utilities
 export const validateEmail = (email: string): boolean => {
+  // Basic format validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+  if (!emailRegex.test(email)) {
+    return false;
+  }
+
+  // Extract domain
+  const domain = email.split('@')[1]?.toLowerCase();
+  if (!domain) {
+    return false;
+  }
+
+  // Prevent obvious fake patterns
+  const suspiciousPatterns = [
+    /^[a-z]{1,4}$/, // Very short random letters like "asdf"
+    /^test\d*$/, // "test", "test1", "test123"
+    /^fake/i, // Starts with "fake"
+    /^dummy/i, // Starts with "dummy" 
+    /^\d+$/, // Only numbers
+    /^[xyz]+$/, // Only x, y, z
+    /^[qwerty]+$/, // Keyboard mashing
+    /^temp/i, // Temporary
+    /^invalid/i, // Obviously invalid
+  ];
+
+  const localPart = email.split('@')[0]?.toLowerCase();
+  if (localPart && suspiciousPatterns.some(pattern => pattern.test(localPart))) {
+    return false;
+  }
+
+  // Block suspicious domains
+  const suspiciousDomains = [
+    'test.com', 'fake.com', 'invalid.com', 'dummy.com',
+    'temp.com', 'throwaway.email', '10minutemail.com'
+  ];
+
+  if (suspiciousDomains.includes(domain)) {
+    return false;
+  }
+
+  // Require legitimate TLD (top-level domain)
+  const legitimateTlds = [
+    'com', 'org', 'net', 'edu', 'gov', 'mil', 'int',
+    'co.uk', 'co.in', 'co.au', 'ca', 'de', 'fr', 'jp',
+    'br', 'ru', 'cn', 'in', 'uk', 'au', 'mx', 'es',
+    'it', 'nl', 'pl', 'se', 'no', 'dk', 'fi', 'be'
+  ];
+
+  const tld = domain.includes('.') ? domain.split('.').slice(-1)[0] : domain;
+  const fullTld = domain.includes('.') ? domain.split('.').slice(-2).join('.') : domain;
+
+  if (!legitimateTlds.includes(tld) && !legitimateTlds.includes(fullTld)) {
+    return false;
+  }
+
+  return true;
 };
 
 // Common weak passwords list (top 100 most common)
