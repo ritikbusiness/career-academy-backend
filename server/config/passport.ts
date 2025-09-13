@@ -53,13 +53,14 @@ passport.use(new LocalStrategy(
   }
 ));
 
-// Google OAuth strategy
-passport.use(new GoogleStrategy(
-  {
-    clientID: process.env.GOOGLE_CLIENT_ID!,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    callbackURL: process.env.OAUTH_CALLBACK_URL || '/api/auth/google/callback'
-  },
+// Google OAuth strategy - only initialize if credentials are provided
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  passport.use(new GoogleStrategy(
+    {
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: process.env.OAUTH_CALLBACK_URL || '/api/auth/google/callback'
+    },
   async (accessToken: string, refreshToken: string, profile: any, done: any) => {
     try {
       // Extract user data from Google profile
@@ -112,6 +113,9 @@ passport.use(new GoogleStrategy(
       return done(error);
     }
   }
-));
+  ));
+} else {
+  console.log('Google OAuth not configured - skipping Google strategy initialization');
+}
 
 export default passport;
