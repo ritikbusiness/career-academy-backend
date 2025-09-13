@@ -1,0 +1,48 @@
+I’m building a Learning Management System (Desired Career Academy) in Node.js + Express with PostgreSQL (using Prisma/Drizzle).  
+Right now, my signup and login system has two major problems:  
+1. It accepts fake emails (like asdf@gmail.com) without validation.  
+2. Google OAuth is hardcoded to john@example.com / John Doe instead of using the real Gmail account.  
+
+I need you to fix my authentication system by doing the following:
+
+✅ In AuthController.register:
+- Validate that the email is in a correct format (use validator or zod).
+- Check if the email already exists in the database using getUserByEmail; if it exists, return an error.
+- Enforce password rules (reject weak/common passwords).
+- Hash passwords with bcrypt before saving.
+- Return proper JSON errors (e.g., { error: "Email already exists" }).
+
+✅ In AuthController.login:
+- Find the user by email.
+- Compare password with bcrypt.compare.
+- If invalid, return JSON error { error: "Invalid credentials" }.
+- If valid, issue JWT access + refresh tokens.
+
+✅ In passport.ts (Google OAuth):
+- Remove any hardcoded test user (john@example.com).
+- Instead, extract from Google profile:
+   const email = profile.emails?.[0]?.value;
+   const name = profile.displayName;
+- Find user by email; if not found, create a new user in DB.
+- Save provider = "google" for these users.
+- Return that user to done().
+
+✅ Use environment variables from .env:
+- GOOGLE_CLIENT_ID
+- GOOGLE_CLIENT_SECRET
+- GOOGLE_CALLBACK_URL
+- JWT_SECRET
+- DATABASE_URL
+
+✅ Add proper error handling and console logging for debugging:
+console.error("Auth error:", err.message);
+
+✅ Make sure CORS is configured to allow frontend (localhost:3000 and Replit preview URL).
+✅ Keep rate-limiting but allow at least 5 attempts before blocking.
+
+Please generate:
+1. Fixed `AuthController.ts` with register & login methods.
+2. Fixed `passport.ts` (GoogleStrategy with profile.emails[0].value).
+3. Example .env template with GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_CALLBACK_URL, JWT_SECRET, DATABASE_URL.
+
+The final code must be production-ready, portable (works on Replit and Ubuntu), and should never allow fake users or test data again.
