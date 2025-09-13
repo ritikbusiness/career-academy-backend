@@ -1,0 +1,64 @@
+I’m building a Learning Management System (Desired Career Academy) with Node.js + Express + PostgreSQL (Prisma/Drizzle ORM).  
+My authentication system has problems:  
+1. Sign-up allows fake emails (like asdf@gmail.com).  
+2. Google OAuth always creates a hardcoded test user (john@example.com / John Doe) instead of the real Gmail.  
+
+I want you to fix this by following a step-by-step plan:
+
+Step 1: Review API Endpoints  
+- Check POST /auth/register and POST /auth/login in server/routes.ts.  
+- Make sure they correctly call AuthController.register and AuthController.login.  
+
+Step 2: Validate Input Data  
+- In AuthController.register:  
+   * Validate email format (using validator or zod).  
+   * Check if the email already exists with getUserByEmail; return error if found.  
+   * Enforce password rules (reject weak/common passwords).  
+- In AuthController.login:  
+   * Ensure both email and password are provided.  
+   * Compare password securely with bcrypt.  
+
+Step 3: Error Handling  
+- Add proper try/catch in register and login.  
+- Log errors to console: console.error("Auth error:", err.message).  
+- Return user-friendly JSON errors ({ error: "Invalid credentials" }).  
+
+Step 4: Database Operations  
+- Verify AuthStorage.getUserByEmail and createUser are correctly querying/inserting into DB.  
+- Log DB queries if needed to avoid silent failures.  
+
+Step 5: Token Management  
+- Ensure JWT tokens are generated and returned correctly in login and register.  
+- Include refresh token rotation and secure HttpOnly cookies.  
+
+Step 6: Google OAuth (passport.ts)  
+- Remove hardcoded john@example.com.  
+- Use real profile data:  
+   const email = profile.emails?.[0]?.value;  
+   const name = profile.displayName;  
+- If user exists, return it. If not, create a new DB entry with provider="google".  
+
+Step 7: Frontend Integration  
+- In React LoginForm.tsx and SignupForm.tsx, ensure forms send correct payloads.  
+- Handle error JSON responses and display them to the user.  
+
+Step 8: Rate Limiting & CORS  
+- Check authLimiter middleware to allow at least 5 attempts.  
+- Ensure CORS is configured to allow requests from localhost:3000 and Replit preview URL.  
+
+Step 9: Test User Flows  
+- Test creating a new account → verify in DB.  
+- Test login with correct and incorrect password.  
+- Test Google login → should insert real Gmail, not john@example.com.  
+
+Step 10: Logging  
+- Add detailed logs in register/login/OAuth flows.  
+- Log email, provider, and DB operations for debugging.  
+
+Deliverables:  
+1. Fixed `AuthController.ts` with register and login methods.  
+2. Fixed `passport.ts` with correct GoogleStrategy profile handling.  
+3. Example `.env` file with GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_CALLBACK_URL, JWT_SECRET, DATABASE_URL.  
+4. Updated CORS and rate-limiter configuration if needed.  
+
+Make the code production-ready, portable (works on Replit + Ubuntu), and ensure no fake emails or test users can slip in anymore.
