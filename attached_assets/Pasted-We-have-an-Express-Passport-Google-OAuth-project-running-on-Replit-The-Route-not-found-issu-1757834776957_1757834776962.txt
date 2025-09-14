@@ -1,0 +1,61 @@
+We have an Express + Passport + Google OAuth project running on Replit.  
+The "Route not found" issue is already fixed (it was due to a double /api prefix).  
+Now the problem is Google OAuth is giving a **403 error** after login.  
+
+Here’s the current setup:
+
+- .env:
+  OAUTH_CALLBACK_URL=https://<my-replit-domain>.replit.dev/api/auth/google/callback
+
+- passport.ts:
+  callbackURL: process.env.OAUTH_CALLBACK_URL || '/api/auth/google/callback'
+
+- Routes are mounted correctly:
+  /auth/google → /api/auth/google
+  /auth/google/callback → /api/auth/google/callback
+
+- Logs:
+  When hitting /api/auth/google, I get a 302 redirect to Google with the correct client_id, scopes, and redirect_uri.  
+  BUT the redirect_uri sometimes falls back to http://localhost:5000/api/auth/google/callback, which causes Google to reject it with a 403.
+
+---
+
+## 🔥 What I need you to do
+
+1. **Fix Google OAuth 403**  
+   - Ensure the GoogleStrategy in `passport.ts` **always uses the Replit domain from .env** (`OAUTH_CALLBACK_URL`), never localhost.  
+   - Make sure the redirect_uri matches EXACTLY what’s in Google Cloud Console Authorized redirect URIs.  
+   - Debug the full OAuth flow until after selecting an account, the user is successfully logged in or signed up.
+
+2. **Fix `authController` callback**  
+   - In the callback, properly handle:  
+     - If the user exists → log them in and return JWT/session.  
+     - If the user does not exist → create a new user in the database, then log them in.  
+   - Ensure consistent return (JSON response or redirect) for success/failure.
+
+3. **Corrected code**  
+   - Show me the fixed and production-ready code for:  
+     - `passport.ts`  
+     - `authController.ts`  
+     - Any changes needed in route setup  
+
+4. **Frontend UX fixes (React/Next or plain React)**  
+   On the login/signup page, add missing user experience features:  
+   - Show/hide password toggle  
+   - Forgot password flow (trigger backend endpoint)  
+   - Email verification flow (send real verification emails)  
+   - Update UI to reflect successful Google sign-in (e.g., show logged-in user profile)
+
+5. **End-to-end working flow**  
+   After applying the fixes, the flow should be:  
+   - User clicks “Login with Google” → redirected to Google → redirected back to Replit callback → user gets signed in / signed up.  
+   - User can also login with email/password with show/hide toggle, reset forgotten password, and verify email.  
+
+---
+
+## ✅ Deliverables
+- Fixed, clean, production-ready code snippets for `passport.ts`, `authController.ts`, and frontend login/signup page.  
+- Debug notes explaining why the 403 was happening and how it was fixed.  
+- Ensure Google Sign-In works end-to-end, and UX features are in place.
+
+---
