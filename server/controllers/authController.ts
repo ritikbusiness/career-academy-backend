@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import passport from 'passport';
 import { AuthStorage } from '../storage/authStorage';
-import { hashPassword, generateAccessToken, generateRefreshToken, verifyRefreshToken, getCookieOptions, validateEmail, validatePassword, sanitizeUserData, generateSecureToken } from '../utils/auth';
+import { hashPassword, generateAccessToken, generateRefreshToken, verifyRefreshToken, getCookieOptions, validateEmail, validatePassword, sanitizeUserData, generateSecureToken, generateOAuthState, getOAuthStateCookieOptions } from '../utils/auth';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/email';
 import { AUTH_ERRORS, createSuccessResponse, ERROR_CODES } from '../utils/errors';
 import { registerSchema, loginSchema, changePasswordSchema, updateProfileSchema } from '@shared/schema';
@@ -318,23 +318,49 @@ export class AuthController {
       callbackUrl: process.env.GOOGLE_CALLBACK_URL,
       clientId: process.env.GOOGLE_CLIENT_ID ? `${process.env.GOOGLE_CLIENT_ID.substring(0, 20)}...` : 'NOT SET'
     });
+    
+    // Generate OAuth state for CSRF protection
+    const state = generateOAuthState();
+    res.cookie('oauth_state', state, getOAuthStateCookieOptions());
+    
     passport.authenticate('google', {
       scope: ['profile', 'email'],
-      prompt: 'select_account' // Force Google account selection
+      prompt: 'select_account', // Force Google account selection
+      state: state // Use our generated state for CSRF protection
     })(req, res, next);
   }
 
   // Google OAuth callback
   static async googleCallback(req: Request, res: Response, next: NextFunction): Promise<void> {
+    // Verify OAuth state for CSRF protection
+    const receivedState = req.query.state as string;
+    const storedState = req.cookies.oauth_state;
+    
+    if (!receivedState || !storedState || receivedState !== storedState) {
+      logger.error('OAuth state mismatch - possible CSRF attack', { 
+        receivedState: receivedState ? 'present' : 'missing',
+        storedState: storedState ? 'present' : 'missing' 
+      });
+      const frontendUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
+      res.clearCookie('oauth_state');
+      res.redirect(`${frontendUrl}/auth/error?message=security_error`);
+      return;
+    }
+    
+    // Clear the state cookie after validation
+    res.clearCookie('oauth_state');
+    
     passport.authenticate('google', { session: false }, async (err: any, user: any) => {
       if (err) {
         logger.error('Google OAuth error:', err);
-        res.redirect(`${process.env.FRONTEND_URL}/auth/error?message=google_auth_failed`);
+        const frontendUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
+        res.redirect(`${frontendUrl}/auth/error?message=google_auth_failed`);
         return;
       }
 
       if (!user) {
-        res.redirect(`${process.env.FRONTEND_URL}/auth/error?message=google_auth_cancelled`);
+        const frontendUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
+        res.redirect(`${frontendUrl}/auth/error?message=google_auth_cancelled`);
         return;
       }
 
@@ -362,11 +388,13 @@ export class AuthController {
         // Set refresh token as httpOnly cookie
         res.cookie('refreshToken', refreshToken, getCookieOptions());
 
-        // Redirect to frontend Google OAuth success page
-        res.redirect(`${process.env.FRONTEND_URL}/auth/google-success`);
+        // Redirect to frontend Google OAuth success page (token available via refresh cookie)
+        const frontendUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
+        res.redirect(`${frontendUrl}/auth/google-success`);
       } catch (tokenError) {
         logger.error('Google OAuth token generation error:', tokenError);
-        res.redirect(`${process.env.FRONTEND_URL}/auth/error?message=token_generation_failed`);
+        const frontendUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
+        res.redirect(`${frontendUrl}/auth/error?message=token_generation_failed`);
       }
     })(req, res, next);
   }

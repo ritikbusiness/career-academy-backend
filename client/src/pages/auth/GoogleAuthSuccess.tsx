@@ -25,65 +25,25 @@ const GoogleAuthSuccess = () => {
         return;
       }
 
-      if (token) {
-        try {
-          // Store the access token
-          localStorage.setItem('accessToken', token);
-          
-          // Fetch user profile with the new token
-          const response = await fetch('/api/auth/me', {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            },
-            credentials: 'include'
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            if (data.success) {
-              updateUser(data.data.user);
-              
-              toast({
-                title: "Login successful",
-                description: `Welcome ${data.data.user.name}! You've successfully signed in with Google.`,
-              });
-              
-              navigate('/dashboard');
-              return;
-            }
-          }
-          
-          throw new Error('Failed to fetch user profile');
-        } catch (error) {
-          console.error('Error processing Google auth:', error);
+      // Since token is no longer passed via URL for security, use refresh token flow
+      try {
+        const refreshed = await refreshToken();
+        if (refreshed) {
           toast({
-            title: "Authentication error",
-            description: "There was an issue processing your Google login.",
-            variant: "destructive",
+            title: "Login successful",
+            description: "Welcome! You've successfully signed in with Google.",
           });
-          navigate('/login');
+          navigate('/dashboard');
+        } else {
+          throw new Error('No valid authentication');
         }
-      } else {
-        // No token or error parameter, try refresh token flow
-        try {
-          const refreshed = await refreshToken();
-          if (refreshed) {
-            toast({
-              title: "Login successful",
-              description: "Welcome back! You've successfully signed in with Google.",
-            });
-            navigate('/dashboard');
-          } else {
-            throw new Error('No valid authentication');
-          }
-        } catch (error) {
-          toast({
-            title: "Authentication failed",
-            description: "Google authentication was not successful.",
-            variant: "destructive",
-          });
-          navigate('/login');
-        }
+      } catch (error) {
+        toast({
+          title: "Authentication failed",
+          description: "Google authentication was not successful.",
+          variant: "destructive",
+        });
+        navigate('/login');
       }
     };
 

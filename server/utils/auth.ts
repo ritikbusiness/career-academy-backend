@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
+import crypto from 'crypto';
 
 import { config } from './config';
 
@@ -106,9 +107,9 @@ export const getCookieOptions = (maxAge?: number) => {
   
   return {
     httpOnly: true,
-    secure: isProduction, // HTTPS only in production
+    secure: true, // Always use secure cookies on Replit (HTTPS)
     sameSite: 'lax' as const,
-    domain: domain && domain !== 'localhost' ? domain : undefined,
+    domain: domain && domain !== 'localhost' ? domain : undefined, // Omit domain for same-origin on Replit
     maxAge: maxAge || 7 * 24 * 60 * 60 * 1000, // 7 days default
     path: '/'
   };
@@ -232,4 +233,19 @@ export const generatePasswordResetToken = (): string => {
 export const sanitizeUserData = (user: any) => {
   const { passwordHash, ...safeUser } = user;
   return safeUser;
+};
+
+// OAuth state utilities for CSRF protection
+export const generateOAuthState = (): string => {
+  return crypto.randomBytes(32).toString('hex');
+};
+
+export const getOAuthStateCookieOptions = () => {
+  return {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax' as const,
+    maxAge: 10 * 60 * 1000, // 10 minutes
+    path: '/'
+  };
 };
