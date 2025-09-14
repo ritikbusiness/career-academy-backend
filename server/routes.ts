@@ -42,8 +42,8 @@ router.get('/auth/verify-email', asyncHandler(EmailController.verifyEmail));
 router.post('/auth/resend-verification', authLimiter.middleware, asyncHandler(EmailController.resendVerification));
 
 // Google OAuth routes
-router.get('/auth/google', AuthController.googleAuth);
-router.get('/auth/google/callback', asyncHandler(AuthController.googleCallback));
+router.get('/api/auth/google', AuthController.googleAuth);
+router.get('/api/auth/google/callback', asyncHandler(AuthController.googleCallback));
 
 // Protected user routes
 router.get('/auth/me', authenticateJWT, requireAuth, asyncHandler(AuthController.getProfile));
