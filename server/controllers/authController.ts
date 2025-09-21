@@ -332,6 +332,31 @@ export class AuthController {
 
   // Google OAuth callback
   static async googleCallback(req: Request, res: Response, next: NextFunction): Promise<void> {
+    // Log all callback details for debugging
+    logger.info('Google OAuth callback received', {
+      query: req.query,
+      cookies: req.cookies,
+      headers: {
+        'user-agent': req.get('User-Agent'),
+        'referer': req.get('Referer'),
+        'host': req.get('Host')
+      },
+      url: req.url,
+      originalUrl: req.originalUrl
+    });
+
+    // Check for Google OAuth errors in query params
+    if (req.query.error) {
+      logger.error('Google OAuth returned error', {
+        error: req.query.error,
+        error_description: req.query.error_description,
+        error_uri: req.query.error_uri
+      });
+      const frontendUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
+      res.redirect(`${frontendUrl}/auth/error?message=google_error_${req.query.error}`);
+      return;
+    }
+
     // Verify OAuth state for CSRF protection
     const receivedState = req.query.state as string;
     const storedState = req.cookies.oauth_state;
@@ -339,7 +364,9 @@ export class AuthController {
     if (!receivedState || !storedState || receivedState !== storedState) {
       logger.error('OAuth state mismatch - possible CSRF attack', { 
         receivedState: receivedState ? 'present' : 'missing',
-        storedState: storedState ? 'present' : 'missing' 
+        storedState: storedState ? 'present' : 'missing',
+        receivedStateLength: receivedState?.length,
+        storedStateLength: storedState?.length
       });
       const frontendUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
       res.clearCookie('oauth_state');
@@ -350,15 +377,35 @@ export class AuthController {
     // Clear the state cookie after validation
     res.clearCookie('oauth_state');
     
-    passport.authenticate('google', { session: false }, async (err: any, user: any) => {
+    logger.info('Starting Google OAuth authentication with passport');
+    
+    passport.authenticate('google', { session: false }, async (err: any, user: any, info: any) => {
+      logger.info('Passport authenticate callback', {
+        hasError: !!err,
+        hasUser: !!user,
+        hasInfo: !!info,
+        errorType: err?.constructor?.name,
+        errorMessage: err?.message,
+        info: info
+      });
+
       if (err) {
-        logger.error('Google OAuth error:', err);
+        logger.error('Google OAuth passport error:', {
+          error: err,
+          message: err.message,
+          stack: err.stack,
+          name: err.name,
+          code: err.code,
+          status: err.status,
+          statusCode: err.statusCode
+        });
         const frontendUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
         res.redirect(`${frontendUrl}/auth/error?message=google_auth_failed`);
         return;
       }
 
       if (!user) {
+        logger.warn('Google OAuth completed but no user returned', { info });
         const frontendUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
         res.redirect(`${frontendUrl}/auth/error?message=google_auth_cancelled`);
         return;

@@ -63,13 +63,31 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     },
   async (accessToken: string, refreshToken: string, profile: any, done: any) => {
     try {
+      logger.info('Google OAuth strategy called', {
+        hasAccessToken: !!accessToken,
+        hasRefreshToken: !!refreshToken,
+        profileId: profile?.id,
+        profileProvider: profile?.provider,
+        profileEmails: profile?.emails?.length,
+        accessTokenLength: accessToken?.length
+      });
+
       // Extract user data from Google profile
       const googleId = profile.id;
       const email = profile.emails?.[0]?.value;
       const name = profile.displayName || profile.name?.givenName + ' ' + profile.name?.familyName;
       const imageUrl = profile.photos?.[0]?.value;
 
+      logger.info('Google profile data extracted', {
+        googleId,
+        email: email ? 'present' : 'missing',
+        name: name ? 'present' : 'missing',
+        imageUrl: imageUrl ? 'present' : 'missing',
+        profileRaw: JSON.stringify(profile, null, 2)
+      });
+
       if (!email) {
+        logger.error('No email found in Google profile', { profile });
         return done(new Error('No email found in Google profile'), undefined);
       }
 
@@ -109,7 +127,13 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       const { passwordHash, ...safeUser } = user;
       return done(null, safeUser);
     } catch (error) {
-      logger.error('Google OAuth strategy error:', error);
+      logger.error('Google OAuth strategy error:', {
+        error: error,
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : undefined,
+        code: (error as any).code
+      });
       return done(error);
     }
   }
