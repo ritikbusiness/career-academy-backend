@@ -11,11 +11,15 @@ const GoogleAuthSuccess = () => {
 
   useEffect(() => {
     const handleGoogleAuthSuccess = async () => {
+      console.log('Google Auth Success page loaded');
+      console.log('Search params:', Object.fromEntries(searchParams.entries()));
+      
       const token = searchParams.get('token');
       const error = searchParams.get('error');
 
       if (error) {
         const errorMessage = searchParams.get('message') || 'Google authentication failed';
+        console.error('Google auth error:', error, errorMessage);
         toast({
           title: "Authentication failed",
           description: errorMessage,
@@ -27,7 +31,10 @@ const GoogleAuthSuccess = () => {
 
       // Since token is no longer passed via URL for security, use refresh token flow
       try {
+        console.log('Attempting to refresh token after Google auth...');
         const refreshed = await refreshToken();
+        console.log('Token refresh result:', refreshed);
+        
         if (refreshed) {
           toast({
             title: "Login successful",
@@ -35,9 +42,11 @@ const GoogleAuthSuccess = () => {
           });
           navigate('/dashboard');
         } else {
+          console.error('Token refresh failed');
           throw new Error('No valid authentication');
         }
       } catch (error) {
+        console.error('Google auth completion error:', error);
         toast({
           title: "Authentication failed",
           description: "Google authentication was not successful.",
