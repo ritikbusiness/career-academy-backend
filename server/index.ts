@@ -98,8 +98,11 @@ app.use('/api', notFound);
   // Create HTTP server
   const server = createServer(app);
   
-  // Use production build for stability
-  serveStatic(app);
+  if (process.env.NODE_ENV === "production") {
+    serveStatic(app);
+  } else {
+    await setupVite(app, server);
+  }
 
   // serve the app on port 5000 for Replit workflow compatibility
   const port = 5000;
