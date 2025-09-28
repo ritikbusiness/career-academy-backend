@@ -11,8 +11,8 @@ const envSchema = z.object({
   // Database
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   
-  // JWT Secrets
-  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  // JWT Secrets - make optional in development
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters').optional(),
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters').optional(),
   
   // Authentication
@@ -65,5 +65,14 @@ export const validateConfig = (): Config => {
   }
 };
 
-// Export validated config
-export const config = validateConfig();
+// Export a lazy-loaded config function
+let _config: Config | null = null;
+export const getConfig = (): Config => {
+  if (!_config) {
+    _config = validateConfig();
+  }
+  return _config;
+};
+
+// For backwards compatibility
+export const config = getConfig();

@@ -1,9 +1,13 @@
+// Load environment variables FIRST before any other imports
 import dotenv from 'dotenv';
-// Load environment variables
-dotenv.config({ path: '.env' });
+import path from 'path';
 
-import 'dotenv/config'; // <- this automatically loads .env before anything else
+dotenv.config({ 
+  path: path.resolve(process.cwd(), '.env'),
+  override: true
+});
 
+// Now import everything else after environment variables are loaded
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import { router } from "./routes";
@@ -11,8 +15,10 @@ import { setupVite, serveStatic, log } from "./vite";
 import { errorHandler, notFound } from "./middleware/errorHandler";
 import { apiLogger } from "./utils/logger";
 import cors from "cors";
-import passport from './config/passport';
 import cookieParser from 'cookie-parser';
+
+// Import passport AFTER environment variables are loaded
+import passport from './config/passport';
 
 const app = express();
 
