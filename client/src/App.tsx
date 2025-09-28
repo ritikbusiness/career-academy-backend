@@ -1,8 +1,9 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider } from './contexts/AuthContext';
-import { Toaster } from '@/components/ui/toaster';
+// Temporarily disable problematic imports for testing
+// import { AuthProvider } from './contexts/AuthContext';
+// import { Toaster } from '@/components/ui/toaster';
 import Index from './pages/Index';
 import Dashboard from './pages/Dashboard';
 import StudentCourses from './pages/StudentCourses';
@@ -37,36 +38,19 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
+      {/* <AuthProvider> */}
         <Router>
           <div className="min-h-screen">
             <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/login" element={<LoginForm />} />
-              <Route path="/signup" element={<SignupForm />} />
-              <Route path="/forgot-password" element={<ForgotPasswordForm />} />
-              <Route path="/reset-password" element={<ResetPasswordForm />} />
-              <Route path="/verify-email" element={<EmailVerificationForm />} />
-              <Route path="/instructor-signup" element={<InstructorSignupWithToken />} />
-              <Route path="/auth/google-success" element={<GoogleAuthSuccess />} />
-              <Route path="/onboarding" element={<OnboardingForm />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/courses" element={<StudentCourses />} />
-              <Route path="/instructor" element={<InstructorDashboard />} />
-              <Route path="/admin" element={<AdminDashboard />} />
-              <Route path="/features" element={<FeatureDemo />} />
-              <Route path="/gamification" element={<GamificationDemo />} />
-              <Route path="/monetization" element={<MonetizationDemo />} />
-              <Route path="/mobile-accessibility" element={<MobileAccessibilityDemo />} />
-              <Route path="/peer-help" element={<PeerHelpCenter />} />
-              <Route path="/unauthorized" element={<Unauthorized />} />
-              <Route path="/404" element={<NotFound />} />
-              <Route path="*" element={<Navigate to="/404" replace />} />
+              <Route path="/" element={<div>Welcome to DesiredCareerAcademy</div>} />
+              <Route path="/login" element={<div>Login Page</div>} />
+              <Route path="/signup" element={<div>Signup Page</div>} />
+              <Route path="*" element={<div>Page Not Found</div>} />
             </Routes>
-            <Toaster />
+            {/* <Toaster /> */}
           </div>
         </Router>
-      </AuthProvider>
+      {/* </AuthProvider> */}
     </QueryClientProvider>
   );
 }
