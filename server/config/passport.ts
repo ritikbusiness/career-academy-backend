@@ -55,12 +55,18 @@ passport.use(new LocalStrategy(
 
 // Google OAuth strategy - only initialize if credentials are provided
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-  passport.use(new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: process.env.GOOGLE_CALLBACK_URL || '/api/auth/google/callback'
-    },
+  try {
+    console.log('✅ Initializing Google OAuth strategy with credentials...');
+    console.log('CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'SET' : 'MISSING');
+    console.log('CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'MISSING');
+    console.log('CALLBACK_URL:', process.env.GOOGLE_CALLBACK_URL || '/api/auth/google/callback');
+    
+    passport.use(new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: process.env.GOOGLE_CALLBACK_URL || '/api/auth/google/callback'
+      },
   async (accessToken: string, refreshToken: string, profile: any, done: any) => {
     try {
       logger.info('Google OAuth strategy called', {
@@ -138,8 +144,15 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     }
   }
   ));
+  console.log('✅ Google OAuth strategy successfully initialized!');
+  } catch (error) {
+    console.error('❌ Error initializing Google OAuth strategy:', error);
+    console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
+  }
 } else {
-  console.log('Google OAuth not configured - skipping Google strategy initialization');
+  console.log('❌ Google OAuth not configured - skipping Google strategy initialization');
+  console.log('CLIENT_ID present:', !!process.env.GOOGLE_CLIENT_ID);
+  console.log('CLIENT_SECRET present:', !!process.env.GOOGLE_CLIENT_SECRET);
 }
 
 export default passport;

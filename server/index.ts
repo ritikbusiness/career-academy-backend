@@ -2,10 +2,16 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
+// Configure environment immediately
 dotenv.config({ 
   path: path.resolve(process.cwd(), '.env'),
   override: true
 });
+
+// Verify environment variables are loaded
+console.log('🔧 Environment variables loaded, initializing Google OAuth...');
+console.log('GOOGLE_CLIENT_ID present:', !!process.env.GOOGLE_CLIENT_ID);
+console.log('GOOGLE_CLIENT_SECRET present:', !!process.env.GOOGLE_CLIENT_SECRET);
 
 // Now import everything else after environment variables are loaded
 import express, { type Request, Response, NextFunction } from "express";
@@ -17,22 +23,34 @@ import { apiLogger } from "./utils/logger";
 import cors from "cors";
 import cookieParser from 'cookie-parser';
 
-// Import passport AFTER environment variables are loaded
-import passport from './config/passport';
+// Main server setup function
+async function setupServer() {
+  const app = express();
 
-const app = express();
+  // Middleware setup
+  app.use(cors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:5000',
+    credentials: true // Enable cookies for authentication
+  }));
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+  app.use(cookieParser()); // Enable cookie parsing for refresh tokens
 
-// Middleware setup
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5000',
-  credentials: true // Enable cookies for authentication
-}));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: false, limit: '10mb' }));
-app.use(cookieParser()); // Enable cookie parsing for refresh tokens
+  // Now we can safely import passport after environment variables are loaded
+  console.log('🔧 Importing passport after environment setup...');
+  const passportModule = await import('./config/passport');
+  const passport = passportModule.default;
+  console.log('✅ Passport imported successfully!');
 
-// Initialize Passport
-app.use(passport.initialize());
+  // Initialize Passport middleware BEFORE setting up routes
+  app.use(passport.initialize());
+  console.log('✅ Passport initialized!');
+
+  return app;
+}
+
+// Initialize the app
+const app = await setupServer();
 
 app.use((req, res, next) => {
   const start = Date.now();
