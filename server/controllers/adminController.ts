@@ -15,8 +15,7 @@ export class AdminController {
         data: {
           instructors: pendingInstructors.map(instructor => ({
             id: instructor.id,
-            username: instructor.username,
-            fullName: instructor.fullName,
+            name: instructor.name,
             email: instructor.email,
             bio: instructor.bio,
             expertiseAreas: instructor.expertiseAreas,
@@ -46,8 +45,7 @@ export class AdminController {
         data: {
           instructors: instructors.map(instructor => ({
             id: instructor.id,
-            username: instructor.username,
-            fullName: instructor.fullName,
+            name: instructor.name,
             email: instructor.email,
             bio: instructor.bio,
             expertiseAreas: instructor.expertiseAreas,
@@ -97,7 +95,7 @@ export class AdminController {
         throw createValidationError('Failed to approve instructor');
       }
 
-      securityLogger.authSuccess(req.user!.id, req.user!.username, req.ip || 'unknown');
+      securityLogger.authSuccess(req.user!.id, req.user!.name, req.ip || 'unknown');
       logger.info(`Admin ${req.user!.id} approved instructor ${instructorId}`, {
         adminId: req.user!.id,
         instructorId: parseInt(instructorId),
@@ -110,8 +108,7 @@ export class AdminController {
         data: {
           instructor: {
             id: updatedInstructor.id,
-            username: updatedInstructor.username,
-            fullName: updatedInstructor.fullName,
+            name: updatedInstructor.name,
             email: updatedInstructor.email,
             instructorStatus: updatedInstructor.instructorStatus,
             verificationDate: updatedInstructor.verificationDate
@@ -169,8 +166,7 @@ export class AdminController {
         data: {
           instructor: {
             id: updatedInstructor.id,
-            username: updatedInstructor.username,
-            fullName: updatedInstructor.fullName,
+            name: updatedInstructor.name,
             email: updatedInstructor.email,
             instructorStatus: updatedInstructor.instructorStatus
           }
@@ -249,8 +245,7 @@ export class AdminController {
         data: {
           instructor: {
             id: updatedInstructor.id,
-            username: updatedInstructor.username,
-            fullName: updatedInstructor.fullName,
+            name: updatedInstructor.name,
             email: updatedInstructor.email,
             instructorStatus: updatedInstructor.instructorStatus
           }
