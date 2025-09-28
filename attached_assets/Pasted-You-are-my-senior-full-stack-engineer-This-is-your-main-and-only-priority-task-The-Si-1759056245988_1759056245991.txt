@@ -1,0 +1,48 @@
+You are my senior full-stack engineer.  
+This is your **main and only priority task**:  
+
+👉 The "Sign up with Google" feature in my project is broken. When I click on it, I get a **403 error**.  
+This has been a long-standing problem and it MUST be fixed today — no excuses.  
+
+---
+
+## 🚨 STRICT INSTRUCTIONS:
+1. **Focus Area**:  
+   The issue is inside the **middleware or OAuth flow code**.  
+   You must read the entire middleware and authentication flow (passport.ts, routes, authController, any middleware that touches auth).  
+
+2. **Your Job**:  
+   - **Find the exact cause** of the 403 error.  
+   - **Fix the root problem in code** (not just theory).  
+   - Make sure the fix uses the `.env` callback URL (Replit domain) and never falls back to localhost.  
+   - Make sure redirect_uri in logs exactly matches the Authorized redirect URI in Google Cloud Console.  
+
+3. **After the Fix**:  
+   - Test the full OAuth flow by yourself (simulate the click on "Sign up with Google").  
+   - Ensure it opens Google’s email chooser, lets me pick an account, then successfully returns to the app and signs me up/logs me in.  
+   - If it fails, do NOT stop. Debug again, find the next cause, and fix it. Keep iterating until it works.  
+
+4. **Proof of Fix**:  
+   - After you test, **take a screenshot (or show log evidence)** proving that the Google Sign-In completes successfully.  
+   - If you can’t screenshot, give me the exact console/log output showing success.  
+
+5. **Non-Negotiable**:  
+   - You cannot skip or avoid a single instruction.  
+   - You must complete the task fully, even if your package/session ends.  
+   - You must keep working and debugging until the Google Sign-In works end-to-end.  
+
+---
+
+## ✅ Deliverables:
+- Corrected middleware/authentication code (passport.ts, middleware, authController if needed).  
+- Explanation of what exactly was wrong and how it was fixed.  
+- Final working code tested by you.  
+- Proof (logs or screenshot simulation) that "Sign up with Google" now works successfully.  
+
+---
+
+## 🔥 Reminder:
+This is your **first and highest priority**.  
+Use **all your skills, all your debugging power, and test again and again** until Google Sign-In works without 403.  
+Do not stop until success is achieved.  
+
