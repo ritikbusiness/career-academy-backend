@@ -1,7 +1,6 @@
 import dotenv from 'dotenv';
 // Load environment variables
-// dotenv.config({ path: '.env' });
-// dotenv.config();
+dotenv.config({ path: '.env' });
 
 import 'dotenv/config'; // <- this automatically loads .env before anything else
 
