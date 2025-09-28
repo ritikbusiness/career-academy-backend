@@ -26,11 +26,20 @@ export default defineConfig(async ({ mode }) => ({
       : []),
   ].filter(Boolean),
   resolve: {
-    alias: {
-      "@": path.resolve(process.cwd(), "client", "src"),
-      "@shared": path.resolve(process.cwd(), "shared"),
-      "@assets": path.resolve(process.cwd(), "attached_assets"),
-    },
+    alias: [
+      {
+        find: "@",
+        replacement: path.resolve(process.cwd(), "client", "src"),
+      },
+      {
+        find: "@shared",
+        replacement: path.resolve(process.cwd(), "shared"),
+      },
+      {
+        find: "@assets",
+        replacement: path.resolve(process.cwd(), "attached_assets"),
+      },
+    ],
   },
   root: path.resolve(process.cwd(), "client"),
   build: {
