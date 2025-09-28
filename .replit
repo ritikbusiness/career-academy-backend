@@ -28,16 +28,16 @@ localPort = 33123
 externalPort = 4200
 
 [[ports]]
+localPort = 34273
+externalPort = 5000
+
+[[ports]]
 localPort = 39895
 externalPort = 3003
 
 [[ports]]
 localPort = 40027
 externalPort = 3002
-
-[[ports]]
-localPort = 46331
-externalPort = 5000
 
 [workflows]
 runButton = "Project"
@@ -59,3 +59,6 @@ author = "agent"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
+
+[agent]
+expertMode = true
